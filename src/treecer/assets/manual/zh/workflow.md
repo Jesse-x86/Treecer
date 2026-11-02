@@ -4,7 +4,7 @@
 
 用 `treecer context show --json` 或 MCP context 读取当前绑定、位置、正文、祖先和直接孩子。核对对象后再接续。
 
-首次进入项目会看到任务目录。已有工作用 task use 或 MCP use_task 按名称选择；新工作用 task add 或 MCP tasks(title=...) 创建。~ 是该任务的讨论根，各个主题作为其孩子。
+首次进入项目会看到任务目录。已有工作用 task use 或 MCP use_task 按名称选择；新工作用 task add 或 MCP tasks(title=...) 创建。`~` 是该任务的讨论根，各个主题作为其孩子。
 
 ## 记录结论和问题
 

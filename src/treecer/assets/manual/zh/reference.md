@@ -22,7 +22,7 @@ treecer doc quick-start --en
 | --json | 结构化输出 |
 | --sudo | 确认本次跨任务写入，也可用 treecer sudo 前缀 |
 
-公共参数可以放在根命令或末级命令之后。shell 中将 "~/..." 加引号，保持 Treecer 的任务根语义。
+公共参数可以放在根命令或末级命令之后。shell 中将 `"~/..."` 加引号，保持 Treecer 的任务根语义。
 
 ## 项目与任务
 
@@ -57,7 +57,7 @@ treecer focus ..
 treecer focus "~"
 ```
 
-~ 指向当前绑定任务的根；绝对地址是 /项目/任务/节点；相对路径从当前位置解析。/ 列项目，/项目 列任务。任务根的父位置是项目目录，绝对根的父位置为空。
+`~` 指向当前绑定任务的根；绝对地址是 /项目/任务/节点；相对路径从当前位置解析。/ 列项目，/项目 列任务。任务根的父位置是项目目录，绝对根的父位置为空。
 
 读取返回 prompt、current、target、source、session，以及节点、祖先或孩子等操作数据。prompt 始终显示保存的真实位置，current 的 project/task 表示当前绑定；target 表示本次对象归属。node 包含 title、path、absolute_path、parent、note、status、revision，内部 ID 留在存储层。
 
@@ -74,7 +74,7 @@ treecer node update "~/方案讨论/方案比较" --revision 3 --title 方案选
 treecer node move "~/方案讨论/方案选择" "~/其他主题" --revision 4
 ```
 
-修订号以实际读取结果为准。新增和普通更新保持位置；改名与移动保留内部身份，会话位置跟随新路径。同父节点下名称唯一，不同分支可以同名；名称含斜杠、百分号、换行或完整名称 .、..、~ 时按 core-concept 的路径段规则编码。
+修订号以实际读取结果为准。新增和普通更新保持位置；改名与移动保留内部身份，会话位置跟随新路径。同父节点下名称唯一，不同分支可以同名；名称含斜杠、百分号、换行或完整名称 .、..、`~` 时按 core-concept 的路径段规则编码。
 
 更新只改提供字段，--note '' 清空正文。状态为「讨论中、已解决、暂放、已取消」。任务根可以更新正文和状态；其位置和根名称由任务身份确定。移动检查名称冲突与无环关系，支持跨任务、跨项目的整条分支移动。
 
@@ -109,7 +109,7 @@ command 可填客户端能找到的可执行文件或绝对路径。服务通过
 
 ## 数据和升级
 
-默认数据目录：Windows 为 %LOCALAPPDATA%\Treecer，其他平台为 ~/.local/share/Treecer。可用 TREECER_HOME 或 --home 覆盖。
+默认数据目录：Windows 为 %LOCALAPPDATA%\Treecer，其他平台为 `~/.local/share/Treecer`。可用 TREECER_HOME 或 --home 覆盖。
 
 catalog.sqlite 保存项目、工作区、会话绑定和位置；projects/<内部项目身份>/project.sqlite 保存各项目的任务和节点。本地 SQLite 使用事务及回滚日志，将跨项目分支移动和位置跟随作为一次提交。
 

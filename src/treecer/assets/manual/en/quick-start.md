@@ -37,9 +37,9 @@ treecer focus "~/Planning"
 treecer node add "Option selection" --note "Open question: how should options be compared?"
 ```
 
-First use discovers or registers a project. task add creates and selects a task's ~ root. node add returns the new node's path while preserving focus. focus explicitly changes the discussion position.
+First use discovers or registers a project. task add creates and selects a task's `~` root. node add returns the new node's path while preserving focus. focus explicitly changes the discussion position.
 
-Quote "~/..." in a shell so it reaches Treecer unchanged, rather than expanding to the operating system's home directory.
+Quote `"~/..."` in a shell so it reaches Treecer unchanged, rather than expanding to the operating system's home directory.
 
 ```text
 treecer focus "~/Planning/Option selection"

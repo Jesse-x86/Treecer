@@ -4,7 +4,7 @@
 
 Use `treecer context show --json` or MCP context to inspect the binding, saved position, content, ancestors, and direct children. Verify the discussion object before continuing.
 
-A new project starts with a task directory. Select existing work with task use or MCP use_task; create new work with task add or MCP tasks(title=...). Each task has a ~ root with topic nodes beneath it.
+A new project starts with a task directory. Select existing work with task use or MCP use_task; create new work with task add or MCP tasks(title=...). Each task has a `~` root with topic nodes beneath it.
 
 ## Record decisions and questions
 

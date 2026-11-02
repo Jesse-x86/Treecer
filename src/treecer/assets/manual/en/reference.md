@@ -22,7 +22,7 @@ Topics: quick-start, core-concept, workflow, reference. Omit the topic for an in
 | --json | Structured output |
 | --sudo | Confirm this cross-task write; also available as treecer sudo prefix |
 
-Options can appear at the root or after the leaf command. Quote "~/..." in shells to preserve Treecer's task-root semantics.
+Options can appear at the root or after the leaf command. Quote `"~/..."` in shells to preserve Treecer's task-root semantics.
 
 ## Projects and tasks
 
@@ -57,7 +57,7 @@ treecer focus ..
 treecer focus "~"
 ```
 
-~ is the bound task root; `/project/task/node` is absolute; relative paths start at focus. / lists projects; /project lists tasks. A task root's parent is its project directory; the global root has no parent.
+`~` is the bound task root; `/project/task/node` is absolute; relative paths start at focus. / lists projects; /project lists tasks. A task root's parent is its project directory; the global root has no parent.
 
 Read results contain prompt, current, target, source, session, and operation data such as node, ancestors, or children. prompt is always the saved position. current.project/task identify the binding; target identifies the operated-on object. node contains title, path, absolute_path, parent, note, status, and revision. Internal IDs stay in storage.
 
@@ -74,7 +74,7 @@ treecer node update "~/Planning/Option" --revision 3 --title "Option selection" 
 treecer node move "~/Planning/Option selection" "~/Other topic" --revision 4
 ```
 
-Use actual returned revisions. Creation and ordinary updates preserve focus. Renames and moves preserve internal identity and saved focus follows the new path. Sibling names must be unique; separate branches may repeat names. Encode slash, percent, line breaks, and entire names ., .., ~ using core-concept's segment rules.
+Use actual returned revisions. Creation and ordinary updates preserve focus. Renames and moves preserve internal identity and saved focus follows the new path. Sibling names must be unique; separate branches may repeat names. Encode slash, percent, line breaks, and entire names ., .., `~` using core-concept's segment rules.
 
 Updates change supplied fields only; --note '' clears content. Literal statuses are 讨论中, 已解决, 暂放, 已取消. Task roots allow content and status updates; their names and locations derive from task identity. Moves reject collisions and cycles and support complete branches across tasks and projects.
 
@@ -109,7 +109,7 @@ Tool scope can provide workspace, project name, source, and session. Each chat k
 
 ## Data and upgrades
 
-Default data: %LOCALAPPDATA%\Treecer on Windows, ~/.local/share/Treecer elsewhere. Override with TREECER_HOME or --home.
+Default data: %LOCALAPPDATA%\Treecer on Windows, `~/.local/share/Treecer` elsewhere. Override with TREECER_HOME or --home.
 
 catalog.sqlite stores projects, workspaces, bindings, and positions. projects/<internal-project-identity>/project.sqlite stores each project's tasks and nodes. Local SQLite transactions and rollback journals commit cross-project moves and position following together.
 

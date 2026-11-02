@@ -37,9 +37,9 @@ treecer focus "~/方案讨论"
 treecer node add 方案选择 --note "待讨论：如何选择合适的方案？"
 ```
 
-首次使用自动发现或登记项目。task add 创建任务并进入其根 ~。node add 返回新节点的路径，保留当前位置；focus 明确进入某个节点。
+首次使用自动发现或登记项目。task add 创建任务并进入其根 `~`。node add 返回新节点的路径，保留当前位置；focus 明确进入某个节点。
 
-CLI 中给 "~/..." 加引号，避免 shell 提前将 ~ 展开成电脑上的用户目录。路径属于 Treecer 的讨论空间。
+CLI 中给 `"~/..."` 加引号，避免 shell 提前将 `~` 展开成电脑上的用户目录。路径属于 Treecer 的讨论空间。
 
 ```text
 treecer focus "~/方案讨论/方案选择"
