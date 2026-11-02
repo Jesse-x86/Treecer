@@ -1,6 +1,6 @@
 # Reference
 
-## CLI entry points and common options
+## Entry points and common options
 
 ```text
 treecer --help
@@ -8,135 +8,125 @@ treecer --version
 treecer setup
 treecer doc --en
 treecer doc quick-start --en
-treecer doc core-concept --en
 ```
 
-Topics are `quick-start`, `core-concept`, `workflow`, and `reference`. Omit the topic for an index. Chinese is the default; `--en` selects English. `doc --json` returns the index; `doc <topic> --json` returns language, topic, title, and content. Manuals ship with the installed version and require no project initialization.
-
-Common options can appear at the root command or after the leaf command:
+Topics: quick-start, core-concept, workflow, reference. Omit the topic for an index. Chinese is the default; --en selects English. --json returns the index or topic as structured data. Documentation requires no project binding.
 
 | Option | Purpose |
 | --- | --- |
-| `--home` | User data directory; overrides TREECER_HOME and the default |
-| `--workspace` / `-C` | Actual workspace; CLI defaults to its working directory |
-| `--project` / `-p` | Select and pin a project by ID or unique name |
-| `--source` | Source identity; defaults to cli for CLI calls |
-| `--session` | Stable session identity; takes priority over TREECER_SESSION |
-| `--json` | Structured output for data commands and doc |
+| --home | Data directory; overrides TREECER_HOME and the default |
+| --workspace / -C | Actual workspace; CLI defaults to its working directory |
+| --project / -p | Manually select and pin a project by name |
+| --source | Source identity; defaults to cli |
+| --session | Stable chat identity; takes priority over TREECER_SESSION |
+| --json | Structured output |
+| --sudo | Confirm this cross-task write; also available as treecer sudo prefix |
 
-`setup` prints connection guidance and the installed skill location. `mcp` starts a stdio protocol server.
+Options can appear at the root or after the leaf command. Quote "~/..." in shells to preserve Treecer's task-root semantics.
 
-## Projects, tasks, and trees
+## Projects and tasks
 
 ```text
 treecer projects
 treecer context show
-treecer context use --project Project
 treecer context use --project Project --task Topic
 treecer context reset
 treecer task list
+treecer task list --at "/OtherProject"
 treecer task add Topic
-treecer task use T1
-treecer tree list
-treecer tree list --task T1
-treecer tree add "Planning" --task T1 --note "Purpose: ..."
-treecer tree add "Project ideas" --project-level
-treecer focus --tree R1
-treecer focus --task T1
-treecer focus --project-level
+treecer task use Topic
 ```
 
-Select tasks by ID or a unique exact title. Duplicate titles return matches; choose an ID. `task add` selects its task; `tree add` focuses its new root. `focus --task` selects a task overview; `focus --project-level` selects the project-level overview. `tree list` defaults to the current task; `--project-level` lists project-level trees.
+task add creates and selects a task and its root. task use selects by unique name and restores its position. Each task is one tree; create discussion topics with node add.
 
-Project resolution uses: explicit project, manually pinned session binding, actual-workspace discovery, then an existing session binding when no workspace is supplied. Discovery walks upward for markers or registered paths and uses a Git root when encountered. With no match, it registers a new project. Workspaces with duplicate names receive distinct suffixed project names.
+Resolution uses an explicit project, a pinned session binding, actual-workspace discovery, then an existing binding when no workspace was supplied. Discovery walks upward for .treecer/project.json or registered paths, stopping at a Git root when encountered. No match registers a new project; duplicate workspace names receive distinct suffixed names.
 
-Explicit `--project` pins the source/session to that project. `context reset` clears the binding and rediscovers from the workspace, retaining project content and saved positions.
+context reset clears a project pin and rediscovers it, preserving content, task selections, and positions. Project names and task names within a project are unique, with exact character and case matching.
 
-## Nodes and local navigation
+## Paths, reads, and navigation
 
 ```text
-treecer node get N27 --tree R1
-treecer context show
-treecer path N27
-treecer parent N27
-treecer children N27 --limit 20 --offset 0
-treecer find Option --tree R1 --limit 20 --offset 0
-treecer node add "Comparison criteria" --parent N27 --note "Open question: ..."
-treecer node update N28 --revision 1 --title "Candidate ranking" --status 暂放 --note "Return when: ..."
-treecer node move N28 N30 --revision 2
-treecer focus N28
+treecer context show "~/Planning"
+treecer node get "~/Planning/Option"
+treecer path "~/Planning/Option"
+treecer parent "~/Planning/Option"
+treecer children "~" --limit 20 --offset 0
+treecer find Option --at "/Project/Topic" --limit 20
+treecer focus "~/Planning/Option"
 treecer focus ..
+treecer focus "~"
 ```
 
-Use actual returned IDs and revisions. Explicit node IDs are project-local; optional `--tree` checks tree ownership. Without a node, use session focus. Supplying only a tree selects its root for reading. The root has an empty parent path; `focus ..` stays at the root when already there.
+~ is the bound task root; `/project/task/node` is absolute; relative paths start at focus. / lists projects; /project lists tasks. A task root's parent is its project directory; the global root has no parent.
 
-Reads and child creation preserve focus. `context show` and `node get` return content, ancestors, and direct children. `children` returns only direct child IDs, titles, and statuses. Pagination defaults to 50; limit must be positive and offset nonnegative. A non-null `next_offset` identifies the next page. Title search uses literal substring matching and returns paths.
+Read results contain prompt, current, target, source, session, and operation data such as node, ancestors, or children. prompt is always the saved position. current.project/task identify the binding; target identifies the operated-on object. node contains title, path, absolute_path, parent, note, status, and revision. Internal IDs stay in storage.
 
-Literal status values are `讨论中` (in discussion), `已解决` (resolved), `暂放` (deferred), and `已取消` (cancelled). Updates change supplied fields only; `--note ''` clears content. Updates and moves require the read revision. `REVISION_CONFLICT` includes the current node; merge before submitting again. Moves preserve all branch IDs and maintain same-tree, single-root, and acyclic relationships.
+Reads preserve focus. focus explicitly navigates; cross-task focus retains the home binding and shows an absolute location. Cross-task content reads, children, parent, and search require no sudo.
 
-Prompt paths escape `/`, `%`, and line breaks. JSON paths retain original titles and segment IDs. Names support display; IDs locate objects.
+Children use creation order, preserved across content updates. Default page size is 50; limit must be positive and offset nonnegative. next_offset indicates a later page. find uses literal title substring matching, defaulting to the current task; --at selects a subtree, project, or the global namespace.
 
-## MCP connection
+## Create, update, and move
 
-Place a server entry in your client's own configuration format. Set command to the treecer executable visible to the client or its absolute path:
+```text
+treecer node add "Planning" --parent "~"
+treecer node add Option --parent "~/Planning" --note "Open question: ..."
+treecer node update "~/Planning/Option" --revision 3 --title "Option selection" --status 暂放 --note "Return when: ..."
+treecer node move "~/Planning/Option selection" "~/Other topic" --revision 4
+```
+
+Use actual returned revisions. Creation and ordinary updates preserve focus. Renames and moves preserve internal identity and saved focus follows the new path. Sibling names must be unique; separate branches may repeat names. Encode slash, percent, line breaks, and entire names ., .., ~ using core-concept's segment rules.
+
+Updates change supplied fields only; --note '' clears content. Literal statuses are 讨论中, 已解决, 暂放, 已取消. Task roots allow content and status updates; their names and locations derive from task identity. Moves reject collisions and cycles and support complete branches across tasks and projects.
+
+Cross-task writes without sudo return SUDO_REQUIRED, identifying the current task, target ownership and path, and a current-task path candidate. Confirm and retry:
+
+```text
+treecer sudo node update "/Project/OtherTopic/Planning" --revision 5 --note "Target checked"
+```
+
+The override retains the binding and selected node; moving that selected node updates its displayed path. Later requests are checked anew. Moves check both source and destination ownership. task use / context use explicitly change the binding; focus navigates.
+
+## MCP
+
+Use the client's server configuration format:
 
 ```json
 {
   "command": "treecer",
-  "args": ["mcp", "--workspace", "V:/work/Project", "--source", "codex"]
+  "args": ["mcp", "--workspace", "/absolute/path/to/project", "--source", "my-assistant"]
 }
 ```
 
-Startup accepts common options. The service communicates over stdio and logs to stderr. Server instructions, tool descriptions, and parameter schemas guide calls.
+command may be a visible executable or its absolute path. Communication is stdio, logging is stderr. Tools: context, projects, tasks, use_task, add_node, update_node, move_node, path, parent, children, find_nodes, focus, reset_context.
 
-Tools: `context`, `projects`, `tasks`, `trees`, `add_node`, `update_node`, `move_node`, `path`, `parent`, `children`, `find_nodes`, `focus`, and `reset_context`.
+- context(path?) returns context. path, parent, children, and find_nodes also use paths.
+- tasks lists without title and creates with title. use_task(title) selects by name.
+- add_node(title,parent?,note?,sudo?) creates children; update_node(path,revision,...) updates fields.
+- move_node(path,new_parent,revision,sudo?) moves branches; cross-task writes explicitly supply sudo=true.
+- focus(path) saves position; reset_context clears the project pin.
 
-- `tasks` lists tasks without title; supplying title creates and selects a task.
-- `trees` lists trees without title; supplying title creates and focuses a tree. task selects a task; project_level selects project-level trees.
-- `context` returns an overview or node context; `add_node` defaults to the current parent.
-- `update_node` and `move_node` take the read revision, with fields and effects corresponding to CLI operations.
-- `focus` saves position; node_id can be `..`. `reset_context` clears the session's project binding so a later call rediscovers it.
+Tool scope can provide workspace, project name, source, and session. Each chat keeps a stable session. A generated default is returned when none was supplied; provide it again after restart. MCP does not infer the user's workspace from the service launch directory. Without a workspace, explicit project, or existing binding it returns CONTEXT_REQUIRED.
 
-Tool scope can supply the actual workspace and chat identity:
+## Data and upgrades
 
-```json
-{
-  "scope": {
-    "workspace": "V:/work/Project",
-    "source": "codex",
-    "session": "host-chat-123"
-  }
-}
-```
+Default data: %LOCALAPPDATA%\Treecer on Windows, ~/.local/share/Treecer elsewhere. Override with TREECER_HOME or --home.
 
-Scope fields are optional. Workspace comes from startup or tool arguments; project manually pins the project. After initial resolution, the same source/session can restore its existing binding. Each chat should keep its own session. The server returns a generated default session when none was supplied; provide it again after restart, or use `--session` / `TREECER_SESSION`.
+catalog.sqlite stores projects, workspaces, bindings, and positions. projects/<internal-project-identity>/project.sqlite stores each project's tasks and nodes. Local SQLite transactions and rollback journals commit cross-project moves and position following together.
 
-MCP uses an explicitly supplied actual workspace. With no workspace, explicit project, or existing binding, it returns `CONTEXT_REQUIRED`; supply scope once to continue.
+On first access, 0.1.2 transactionally migrates 0.1.1 data: old tree roots become topics beneath task roots, preserving content, status, and resume positions. Legacy project-level topics move into a new inbox task; occupied names use inbox (2), etc. The new interface uses paths. Stop old-version service processes before upgrading.
 
-## Data, backup, and errors
+Duplicate legacy task or resulting sibling names produce MIGRATION_CONFLICT and roll back that project's migration, preserving its data until the new names are determined. For backup, stop relevant processes and copy the complete data directory and workspace markers. Check context show after restoration.
 
-The default data directory is `%LOCALAPPDATA%\Treecer` on Windows and `~/.local/share/Treecer` elsewhere. Override it with `TREECER_HOME` or `--home`. It contains:
+## Errors
 
-```text
-catalog.sqlite
-projects/<project-ID>/project.sqlite
-```
+- SUDO_REQUIRED: check ownership, then explicitly override or correct the path.
+- REVISION_CONFLICT: merge current content and submit its latest revision.
+- DUPLICATE_NAME: choose another sibling name or update the existing node.
+- NODE_NOT_FOUND / TASK_NOT_FOUND / PROJECT_NOT_FOUND: check path and data directory; node errors include the nearest existing ancestor.
+- TASK_REQUIRED / NODE_REQUIRED: select a task or node.
+- INVALID_MOVE / ROOT_OPERATION: preserve acyclic relationships and task roots.
+- TARGET_CHANGED: reread the path after concurrent movement.
+- MIGRATION_CONFLICT: original content remains; determine distinct names.
+- STORE_BUSY: refresh and retry later.
 
-The catalog stores projects, workspaces, and session project bindings. Each project database stores tasks, trees, nodes, and positions. Workspace `.treecer/project.json` markers accompany the matching data directory. Local processes share access through WAL, foreign keys, and short transactions; node revisions detect stale edits.
-
-For backup, stop the relevant Treecer processes and copy the complete data directory and workspace markers. Preserve any `-wal` / `-shm` files left after abnormal exit. After restoring matching files, use `context show` to check project and position.
-
-| Error | Action |
-| --- | --- |
-| CONTEXT_REQUIRED | Supply an actual workspace or registered project |
-| PROJECT_NOT_FOUND | Check project selection, data directory, and marker belong together |
-| INVALID_MARKER / PROJECT_MISMATCH | Check marker or database identity; restore the correct files |
-| NODE_REQUIRED | Focus a node, select a tree, or create one |
-| NODE_NOT_FOUND / TREE_NOT_FOUND / TASK_NOT_FOUND | Query the current project for the actual ID |
-| AMBIGUOUS_TASK | Select a returned task ID |
-| TREE_MISMATCH / TASK_MISMATCH | Check node, tree, and task ownership |
-| INVALID_MOVE | Choose a valid same-tree parent while preserving root and acyclic relationships |
-| REVISION_CONFLICT | Merge the current content and submit its latest revision |
-| STORE_BUSY / WORKSPACE_CHANGED | Retry later after refreshing relevant context |
-
-CLI failures print errors and return nonzero exit codes. MCP reports tool errors. Unknown documentation topics report available names through command help.
+CLI failures return nonzero exit codes. MCP returns tool errors.

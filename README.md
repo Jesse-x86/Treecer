@@ -4,46 +4,44 @@
 
 和 AI 讨论一个复杂问题时，一个分支往往又引出另一个分支。聊得很深入，回头却忘了最初的问题，还有哪些想法没有聊完。
 
-Treecer 把这些问题、结论和旁枝保存成一棵可接续的讨论树。助手可以随对话维护它，每次只读取当前位置、祖先路径和直接孩子，接着讨论。
+Treecer 把问题、结论和旁枝保存成可接续的讨论树。助手随对话维护它，每次按需读取当前位置、祖先和直接孩子，再深入或回溯。
 
 ```text
-Topic@Project# 方案讨论/方案比较/比较标准 [N27]
+Topic@Project: ~/方案讨论/方案选择$
 ```
 
-这一行告诉你：正在为 **Project** 项目的 **Topic** 任务，讨论「比较标准」；往上可以回到「方案比较」和「方案讨论」。
+这一行表示：当前绑定 Project 项目的 Topic 任务，正在讨论「方案讨论」下的「方案选择」。~ 是任务根，对应 `/Project/Topic`。
 
-Treecer = **tree + tracer**。它是一个本地 Python 工具，提供 CLI 和 MCP 接口，供你已有的 AI 助手调用。
+Treecer = **tree + tracer**。这是一个本地 Python 工具，通过 CLI 和 MCP 供你已有的助手调用。
 
 ## 能做什么
 
-- **跟踪讨论分支**：记录问题、用户决定、助手建议、开放问题和下一步。
-- **局部浏览与回溯**：查看路径、父问题和直接孩子，找回暂放的旁枝。
-- **按项目和任务组织**：每个项目独立存储，一项任务可以有多棵讨论树。
-- **跨聊天接续**：不同助手和会话共享讨论内容，分别保存自己的位置。
-- **自动维护身份**：节点 ID 自动生成，标题可以重复，改名和移动保留 ID。
-- **本地持久化**：使用 SQLite 保存数据；Treecer 自身不调用模型。
+- **按路径维护讨论**：同父名称唯一，节点身份由工具内部维护，改名和移动后会话位置跟随。
+- **局部浏览与回溯**：查看正文、祖先和直接孩子，找回暂放的旁枝。
+- **按项目和任务组织**：项目分库，每项任务拥有一棵根为 ~ 的树。
+- **跨聊天接续**：来源和会话共享讨论内容，分别保留任务选择和位置。
+- **明确跨任务目标**：查看其他任务直接允许；修改其他任务时显式 sudo，返回准确目标归属。
+- **本地持久化**：SQLite 保存数据，Treecer 自身不调用模型。
 
 ## 安装
 
-需要 **Python 3.11+** 和已配置好命令路径的 [pipx](https://pipx.pypa.io/stable/)。
-
-首个版本发布到 PyPI 后，可执行：
+需要 **Python 3.11+** 和已配置命令路径的 [pipx](https://pipx.pypa.io/stable/)。首个版本发布到 PyPI 后可执行：
 
 ```text
 pipx install treecer
 ```
 
-当前也可以安装收到的 wheel 文件，或在源码目录安装：
+当前可安装收到的发行包，或在源码目录安装：
 
 ```text
-pipx install ./treecer-0.1.1-py3-none-any.whl
+pipx install ./treecer-0.1.2-py3-none-any.whl
 ```
 
 ```text
 pipx install .
 ```
 
-安装完成后，进入要记录讨论的工作目录：
+安装后进入要跟踪讨论的工作区：
 
 ```text
 treecer --help
@@ -51,58 +49,74 @@ treecer setup
 treecer doc quick-start
 ```
 
-`setup` 提供助手接入指南及随包 skill 的实际位置。
+setup 提供助手接入指南及随包 skill 的位置。
 
 ## 试一次分叉和回溯
 
-例如，在一个名为 Project 的工作区中：
+例如，在名为 Project 的工作目录：
 
 ```text
 treecer context show
 treecer task add Topic
-treecer tree add 方案讨论
+treecer node add 方案讨论
+treecer focus "~/方案讨论"
 treecer node add 方案选择 --note "待讨论：如何选择合适的方案？"
 ```
 
-工具自动发现或登记项目，创建任务、树和节点，并返回生成的 ID。
-
-假设新问题返回 `N2`，可以进入它：
+新增返回新节点路径，同时保留当前讨论位置。明确进入它：
 
 ```text
-treecer focus N2
+treecer focus "~/方案讨论/方案选择"
 treecer context show
 ```
 
 ```text
-Topic@Project# 方案讨论/方案选择 [N2]
-N2 方案选择〔讨论中〕 revision=1
+Topic@Project: ~/方案讨论/方案选择$
+节点：~/方案讨论/方案选择〔讨论中〕 revision=3
 待讨论：如何选择合适的方案？
 子问题：
 ```
 
-讨论告一段落后，用读取到的修订号记录结论，回到父问题：
+这里的 revision=3 对应全新示例项目；实际使用读取到的修订号。讨论结束后记录结论，再回父问题：
 
 ```text
-treecer node update N2 --revision 1 --status 已解决 --note "用户已确定：按实际使用场景比较方案"
+treecer node update "~/方案讨论/方案选择" --revision 3 --status 已解决 --note "用户已确定：按实际使用场景比较方案"
 treecer focus ..
 treecer children
 ```
 
-实际操作使用工具返回的 ID 和 revision。普通读取和新增孩子保留当前位置；`focus` 保存新的讨论位置。重新进入同一会话后，可以从该位置接续。
+prompt 始终表示实际保存的位置，target 和 node 单独表示本次操作对象。路径支持 ~、相对位置、.、.. 和 `/项目/任务/节点` 绝对地址。CLI 中给 "~/..." 加引号，避免 shell 提前展开到电脑的用户目录。
 
-## 和 AI 助手一起使用
+## 查阅和修改其他任务
+
+目标路径存在时，可以直接查看：
+
+```text
+treecer context show "/Project/OtherTopic/方案讨论"
+```
+
+查看保留当前绑定与位置。跨任务写入缺少 sudo 时，工具停止并提示：
+
+```text
+本次修改未执行。你正在尝试修改 OtherTopic@Project 的 ~/方案讨论。
+当前任务是 Topic@Project。
+```
+
+完整错误还给出绝对目标路径和当前任务的路径候选。核对目标后，使用 `treecer sudo <原指令>` 或 --sudo；MCP 对应本次请求的 sudo=true。覆写逐次检查，保留当前绑定。分支移动支持跨任务与跨项目，并让保存的位置跟随节点。
+
+## 与 AI 助手配合
 
 ### CLI
 
-支持终端调用的助手可以直接运行 `treecer`。可以这样交代它：
+支持终端调用的助手可以直接执行 treecer。可以这样交代：
 
-> 用 Treecer 跟踪这次讨论。先查看当前项目和位置；出现有价值的分支、确认结论或切换话题时更新。聊完一个分支后，帮我回到父问题并找回还没聊完的旁枝。
+> 用 Treecer 跟踪这次讨论。先查看项目、任务和当前位置；有价值的分支、确认的结论或话题切换出现时更新。聊完一支，帮我回到父问题并找回未完成的旁枝。
 
-`treecer setup` 会显示随包 skill 的位置。这个 skill 指导助手怎样分叉、记录和回溯；命令详情可以按需查阅离线手册。
+`treecer setup` 给出随包 skill 的实际位置。skill 指导助手怎样记录和回溯，命令详情从离线手册按需查询。
 
 ### MCP
 
-在支持 stdio MCP 的客户端中，按客户端的配置格式添加服务器条目：
+按客户端配置格式添加服务器条目：
 
 ```json
 {
@@ -111,9 +125,7 @@ treecer children
 }
 ```
 
-`command` 使用客户端能够找到的可执行文件，也可以填写其绝对路径。`--workspace` 填实际工作区。
-
-多个聊天共用入口时，助手或接入端通过工具参数提供各自稳定的会话标识：
+command 使用客户端能找到的可执行文件或其绝对路径。--workspace 指向实际工作区。每个聊天通过工具参数提供稳定会话：
 
 ```json
 {
@@ -123,9 +135,9 @@ treecer children
 }
 ```
 
-相同来源与会话可以在重启后接续。工具也会返回当前 session；完整接入方式见 `treecer doc reference`。
+任务用 tasks 创建、use_task 按名称选择；context 读取上下文，add_node、update_node、move_node 使用路径。不同聊天共享内容、位置独立，相同来源与会话在重启后接续。完整参数见 `treecer doc reference`。
 
-## 随包离线手册
+## 离线手册
 
 ```text
 treecer doc
@@ -133,35 +145,18 @@ treecer doc quick-start
 treecer doc core-concept
 treecer doc workflow
 treecer doc reference
-```
-
-默认中文，添加 `--en` 阅读英文：
-
-```text
 treecer doc quick-start --en
 ```
 
-| 主题 | 内容 |
-| --- | --- |
-| quick-start | 安装、首次记录和接续 |
-| core-concept | 项目、任务、树、节点、来源与会话 |
-| workflow | 分叉、结论、暂放、回溯与协作 |
-| reference | CLI、自动绑定、MCP、数据位置和排障 |
+默认中文，--en 阅读英文。四篇手册覆盖快速开始、概念、讨论方法和操作参考，随包安装；查询文档无需项目绑定。参数语法用 --help 查看。
 
-手册随安装包分发，读取时无需绑定项目。命令语法用 `--help` 查询。
+## 数据和升级
 
-## 数据保存在哪里
+首次登记项目会在工作区写入 `.treecer/project.json` 保存项目身份。数据库默认位于 Windows 的 `%LOCALAPPDATA%\Treecer` 或其他平台的 `~/.local/share/Treecer`，可用 TREECER_HOME 或 --home 覆盖。
 
-首次登记项目时，在工作区写入 `.treecer/project.json` 保存项目身份。数据库默认保存在：
+CLI 默认按工作区接续；用 --source、--session 或 TREECER_SESSION 区分聊天。task use 恢复各任务自己的位置，context use 提供手动换绑。
 
-| 平台 | 默认数据目录 |
-| --- | --- |
-| Windows | `%LOCALAPPDATA%\Treecer` |
-| Linux / macOS | `~/.local/share/Treecer` |
-
-可以用 `TREECER_HOME` 或 `--home` 指定数据目录。升级程序后继续读取原有讨论资料。
-
-CLI 默认按工作区接续；需要区分聊天或终端时，使用 `--source`、`--session` 或 `TREECER_SESSION`。换绑、备份和恢复步骤见 `treecer doc reference`。
+0.1.2 首次访问时迁移旧版数据：原树根成为任务根下的主题，正文、状态和位置保留。旧项目级主题进入 inbox 任务。遇到旧数据同名冲突时，迁移回滚并报告冲突，原内容保留。升级前结束旧版服务进程，详细编码、迁移与恢复方法见操作参考。
 
 ## 开发
 
@@ -174,10 +169,10 @@ python -m venv .venv
 ```text
 python -m pip install -e ".[dev]"
 python -m pytest -q
-python -m build
+python -m build --outdir dist/pypi
 ```
 
-当前验收环境为 Windows / Python 3.12，包含实际 CLI、多进程写入和 stdio MCP 接续测试。安装包也经过独立 pipx 安装及离开源码目录后的调用验证。
+验收覆盖路径、任务边界、并发与跨项目移动回滚、旧数据迁移、实际 CLI 和 stdio MCP 接续。当前本机验收环境为 Windows / Python 3.12。
 
 ## 许可证
 

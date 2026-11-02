@@ -1,22 +1,20 @@
 # 快速开始
 
-Treecer 把讨论保存为可接续的树。助手随讨论维护节点，工具提供项目定位、局部导航和持久保存。
+Treecer 让助手用名称和路径保存、深入并接续讨论。默认位置形如：
+
+```text
+Topic@Project: ~/方案讨论/方案选择$
+```
 
 ## 安装
 
-需要 Python 3.11 或更新版本，以及已经配置好命令路径的 pipx。从源码目录安装：
+需要 Python 3.11+ 和已配置命令路径的 pipx。安装收到的发行包：
 
 ```text
-pipx install .
+pipx install ./treecer-0.1.2-py3-none-any.whl
 ```
 
-也可以安装拿到的发行包：
-
-```text
-pipx install ./treecer-0.1.1-py3-none-any.whl
-```
-
-安装后可以离开源码目录使用。先查看入口：
+也可从源码目录执行 `pipx install .`。安装后离开源码目录仍可调用：
 
 ```text
 treecer --help
@@ -25,56 +23,56 @@ treecer doc
 treecer doc quick-start --en
 ```
 
-`setup` 显示接入说明和随包 skill 的实际位置。`doc` 列出四个主题，提供主题名则读取正文，默认中文，`--en` 阅读英文。查询文档无需项目绑定，也不会创建项目数据。
+手册默认中文，--en 阅读英文；文档查询无需项目绑定，也不会创建数据库。setup 显示接入指南和随包 skill 的位置。
 
-## 第一次记录
+## 创建任务和讨论主题
 
-进入想要跟踪讨论的工作区，执行：
+进入工作区，例如名为 Project 的目录：
 
 ```text
 treecer context show
 treecer task add Topic
-treecer tree add 方案讨论
-treecer node add 选择条件 --note "待讨论：何时触发方案比较？"
+treecer node add 方案讨论
+treecer focus "~/方案讨论"
+treecer node add 方案选择 --note "待讨论：如何选择合适的方案？"
 ```
 
-首次使用自动发现或登记项目，在工作区写入 `.treecer/project.json`，数据库保存在用户本地数据目录。任务创建后被选中，创建树后进入根节点；添加孩子时保持原讨论位置。
+首次使用自动发现或登记项目。task add 创建任务并进入其根 ~。node add 返回新节点的路径，保留当前位置；focus 明确进入某个节点。
 
-每次创建都会返回自动生成的 ID。以下用全新项目中的示例 ID `N2` 演示，实际操作使用返回值：
+CLI 中给 "~/..." 加引号，避免 shell 提前将 ~ 展开成电脑上的用户目录。路径属于 Treecer 的讨论空间。
 
 ```text
-treecer focus N2
+treecer focus "~/方案讨论/方案选择"
 treecer context show
 ```
 
-如果工作区名为 Project，会看到：
+返回当前正文、祖先和直接孩子。默认提示始终表示保存的真实位置；操作对象通过单独的节点路径显示。节点身份由工具内部维护，日常操作使用路径。
+
+## 记录结论并回溯
+
+先读取节点，使用返回的 revision 更新。以下修订号 3 对应全新示例项目，实际以读取值为准：
 
 ```text
-Topic@Project# 方案讨论/选择条件 [N2]
-```
-
-这行依次表示任务、项目、根到当前问题的路径和节点 ID。下面是当前节点正文及直接孩子。
-
-## 记录结论，回到父问题
-
-读取节点会返回 `revision`。假设当前值为 1：
-
-```text
-treecer node update N2 --revision 1 --status 已解决 --note "用户已确定：按当前消息需要触发方案比较"
+treecer node get "~/方案讨论/方案选择" --json
+treecer node update "~/方案讨论/方案选择" --revision 3 --status 已解决 --note "用户已确定：按实际使用场景比较方案"
 treecer focus ..
 treecer children
 ```
 
-`focus ..` 返回父节点，`children` 显示仍可继续的分支。状态由明确更新决定，子问题完成后，助手回到父问题核对剩余内容。
+状态为「讨论中、已解决、暂放、已取消」。子问题完成后，回父问题核对剩余问题，再找回暂放的旁枝。
 
-## 恢复与多个聊天
+## 查看和修改其他任务
 
-重新在同一工作区调用 `context show` 可恢复 CLI 的位置。独立聊天或终端可使用各自稳定标识：
+绝对路径明确指定项目和任务：
 
 ```text
-treecer context show --source codex --session chat-123
+treecer context show "/Project/OtherTopic/方案讨论"
 ```
 
-后续调用使用相同 `--source` 和 `--session`，或通过 `TREECER_SESSION` 持续提供会话标识。跨来源访问同一项目时共享讨论内容，各会话保留自己的位置。
+路径需已存在。跨任务查看直接允许，保留当前任务与位置。跨任务写入会停止并提示目标归属；确认目标后，用 `treecer sudo <原指令>` 或 --sudo 重试。sudo 只对当前这次写入生效。
 
-MCP 接入方式、工具参数和排障见 `treecer doc reference`。概念关系见 `treecer doc core-concept`；如何组织讨论见 `treecer doc workflow`。
+## 接续
+
+CLI 默认按工作区接续。不同聊天或终端可通过相同 --source 和 --session 恢复各自位置，或用 TREECER_SESSION 提供会话标识。task use 按名称切换任务并恢复该任务的位置。
+
+MCP 用 scope.workspace 提供工作区、scope.session 提供稳定聊天标识；写入工具的 sudo=true 对应显式跨任务确认。完整参数和迁移说明见 `treecer doc reference`。

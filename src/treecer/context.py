@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from .errors import TreecerError
-from .store import CATALOG_SCHEMA, data_home, initialize, project_database, transaction
+from .store import data_home, initialize, project_database, transaction
 
 
 def canonical(path):
@@ -16,7 +16,9 @@ def canonical(path):
 def workspace_anchor(path):
     folder = Path(path).expanduser().resolve()
     for candidate in (folder, *folder.parents):
-        if (candidate / ".treecer" / "project.json").exists() or (candidate / ".git").exists():
+        if (candidate / ".treecer" / "project.json").exists() or (
+            candidate / ".git"
+        ).exists():
             return candidate
     return folder
 
@@ -27,15 +29,35 @@ class ContextResolver:
         self.workspace = workspace
         self.source = source
         # CLI can reconnect by workspace. MCP supplies a generated or host session ID.
-        self.session = session or os.environ.get("TREECER_SESSION") or (
-            "workspace:" + canonical(workspace_anchor(workspace)) if workspace else "unbound"
+        self.session = (
+            session
+            or os.environ.get("TREECER_SESSION")
+            or (
+                "workspace:" + canonical(workspace_anchor(workspace))
+                if workspace
+                else "unbound"
+            )
         )
         self.catalog = self.home / "catalog.sqlite"
-        initialize(self.catalog, CATALOG_SCHEMA)
+        initialize(self.catalog)
 
     def projects(self):
-        with transaction(self.catalog) as connection:
-            return [dict(row) for row in connection.execute("SELECT * FROM projects ORDER BY name")]
+        from .paths import absolute
+
+        with transaction(self.catalog) as (connection, _):
+            return [
+                {"title": row["name"], "path": absolute([row["name"]])}
+                for row in connection.execute("SELECT * FROM projects ORDER BY name")
+            ]
+
+    def project_named(self, name):
+        with transaction(self.catalog) as (connection, _):
+            row = connection.execute(
+                "SELECT * FROM projects WHERE name=?", (name,)
+            ).fetchone()
+            if row is None:
+                raise TreecerError("PROJECT_NOT_FOUND", f"找不到项目：{name}")
+            return dict(row)
 
     def _project(self, connection, selector):
         rows = connection.execute(
@@ -47,25 +69,34 @@ class ContextResolver:
 
     def resolve(self, project=None, workspace=None):
         workspace = workspace or self.workspace
-        with transaction(self.catalog, write=True) as connection:
+        with transaction(self.catalog, write=True) as (connection, _):
             binding = connection.execute(
-                "SELECT * FROM bindings WHERE source=? AND session=?", (self.source, self.session)
+                "SELECT * FROM bindings WHERE source=? AND session=?",
+                (self.source, self.session),
             ).fetchone()
             if project:
-                selected = self._project(connection, project)
+                row = connection.execute(
+                    "SELECT * FROM projects WHERE name=?", (project,)
+                ).fetchone()
+                if row is None:
+                    raise TreecerError("PROJECT_NOT_FOUND", f"找不到项目：{project}")
+                selected = dict(row)
                 pinned = True
             elif binding and binding["pinned"]:
                 selected = self._project(connection, binding["project_id"])
                 pinned = True
             elif workspace:
-                selected = self._discover(connection, Path(workspace).expanduser().resolve())
+                selected = self._discover(
+                    connection, Path(workspace).expanduser().resolve()
+                )
                 pinned = False
             elif binding:
                 selected = self._project(connection, binding["project_id"])
                 pinned = False
             else:
                 raise TreecerError(
-                    "CONTEXT_REQUIRED", "请提供实际工作区 workspace 或已登记项目 project；MCP 不推测服务启动目录。"
+                    "CONTEXT_REQUIRED",
+                    "请提供实际工作区 workspace 或已登记项目 project；MCP 不推测服务启动目录。",
                 )
             connection.execute(
                 "INSERT INTO bindings VALUES (?,?,?,?) ON CONFLICT(source,session) "
@@ -73,8 +104,13 @@ class ContextResolver:
                 (self.source, self.session, selected["id"], int(pinned)),
             )
         database = project_database(self.home, selected["id"])
-        return {**selected, "database": database, "source": self.source,
-                "session": self.session, "pinned": pinned}
+        return {
+            **selected,
+            "database": database,
+            "source": self.source,
+            "session": self.session,
+            "pinned": pinned,
+        }
 
     def _discover(self, connection, workspace):
         if not workspace.is_dir():
@@ -90,11 +126,14 @@ class ContextResolver:
                     if uuid.UUID(project_id).hex != project_id:
                         raise ValueError("invalid project ID")
                 except (ValueError, KeyError, TypeError) as error:
-                    raise TreecerError("INVALID_MARKER", f"项目标记无效：{marker}") from error
+                    raise TreecerError(
+                        "INVALID_MARKER", f"项目标记无效：{marker}"
+                    ) from error
                 selected = self._project(connection, project_id)
                 connection.execute(
                     "INSERT INTO workspaces VALUES (?,?) ON CONFLICT(path) "
-                    "DO UPDATE SET project_id=excluded.project_id", (canonical(folder), project_id)
+                    "DO UPDATE SET project_id=excluded.project_id",
+                    (canonical(folder), project_id),
                 )
                 return selected
             registered = connection.execute(
@@ -109,11 +148,15 @@ class ContextResolver:
         base = root.name or "project"
         name = base
         suffix = 2
-        while connection.execute("SELECT 1 FROM projects WHERE name=?", (name,)).fetchone():
+        while connection.execute(
+            "SELECT 1 FROM projects WHERE name=?", (name,)
+        ).fetchone():
             name = f"{base}-{suffix}"
             suffix += 1
         connection.execute("INSERT INTO projects VALUES (?,?)", (project_id, name))
-        connection.execute("INSERT INTO workspaces VALUES (?,?)", (canonical(root), project_id))
+        connection.execute(
+            "INSERT INTO workspaces VALUES (?,?)", (canonical(root), project_id)
+        )
         marker = root / ".treecer" / "project.json"
         marker.parent.mkdir(parents=True, exist_ok=True)
         # Exclusive creation prevents silently replacing another process's marker.
@@ -121,11 +164,15 @@ class ContextResolver:
             with marker.open("x", encoding="utf-8") as stream:
                 json.dump({"project_id": project_id}, stream)
         except FileExistsError as error:
-            raise TreecerError("WORKSPACE_CHANGED", "工作区标记刚刚变化，请重新调用。") from error
+            raise TreecerError(
+                "WORKSPACE_CHANGED", "工作区标记刚刚变化，请重新调用。"
+            ) from error
         return {"id": project_id, "name": name}
 
     def reset(self):
-        with transaction(self.catalog, write=True) as connection:
-            connection.execute("DELETE FROM bindings WHERE source=? AND session=?",
-                               (self.source, self.session))
+        with transaction(self.catalog, write=True) as (connection, _):
+            connection.execute(
+                "DELETE FROM bindings WHERE source=? AND session=?",
+                (self.source, self.session),
+            )
         return {"reset": True, "source": self.source, "session": self.session}

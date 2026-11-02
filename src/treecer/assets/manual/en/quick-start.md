@@ -1,22 +1,20 @@
 # Quick start
 
-Treecer stores discussions as resumable trees. The assistant maintains discussion content; the tool handles project discovery, local navigation, and persistence.
+Treecer lets assistants save and resume discussions through names and paths:
+
+```text
+Topic@Project: ~/Planning/Option selection$
+```
 
 ## Install
 
-Use Python 3.11 or newer and pipx with its app directory configured on PATH. From a source checkout:
+Use Python 3.11+ and pipx with its app directory on PATH:
 
 ```text
-pipx install .
+pipx install ./treecer-0.1.2-py3-none-any.whl
 ```
 
-You can also install a distribution wheel you received:
-
-```text
-pipx install ./treecer-0.1.1-py3-none-any.whl
-```
-
-The installed app works outside the source checkout. Explore its entry points:
+From a source checkout, use `pipx install .`. The installed app works outside that checkout:
 
 ```text
 treecer --help
@@ -25,56 +23,56 @@ treecer doc --en
 treecer doc quick-start --en
 ```
 
-`setup` prints connection guidance and the installed skill location. `doc` lists four topics; supply a topic to read it. Manuals default to Chinese; `--en` selects English. Documentation works before project binding and creates no project data.
+Manuals default to Chinese; --en selects English. Documentation creates no project data. setup prints connection guidance and the installed skill location.
 
-## Record your first discussion
+## Create a task and topic
 
-Enter the workspace you want to track, then run:
+Enter your workspace, for example a directory named Project:
 
 ```text
 treecer context show
 treecer task add Topic
-treecer tree add "Planning"
+treecer node add "Planning"
+treecer focus "~/Planning"
 treecer node add "Option selection" --note "Open question: how should options be compared?"
 ```
 
-First use discovers or registers the project, writes `.treecer/project.json` in the workspace, and stores databases in your local user data directory. Creating a task selects it; creating a tree focuses its root. Adding a child preserves the existing focus.
+First use discovers or registers a project. task add creates and selects a task's ~ root. node add returns the new node's path while preserving focus. focus explicitly changes the discussion position.
 
-Creation returns an automatically assigned ID. The example below assumes `N2` in a fresh project; use the ID actually returned:
+Quote "~/..." in a shell so it reaches Treecer unchanged, rather than expanding to the operating system's home directory.
 
 ```text
-treecer focus N2
+treecer focus "~/Planning/Option selection"
 treecer context show
 ```
 
-For a workspace named Project, the prompt is:
+The result contains current content, ancestors, and direct children. The prompt always describes saved focus; the operated-on node has a separate path. Internal identities are maintained by the tool; callers use paths.
+
+## Record a conclusion and return
+
+Read the node and submit its revision. Revision 3 below matches this fresh example; use the value actually returned:
 
 ```text
-Topic@Project# Planning/Option selection [N2]
-```
-
-It identifies the task, project, root-to-current path, and node ID. Current node content and direct children follow.
-
-## Record a decision and return
-
-Reading a node returns its `revision`. Assuming the current value is 1:
-
-```text
-treecer node update N2 --revision 1 --status 已解决 --note "User decided: compare options against the intended use case"
+treecer node get "~/Planning/Option selection" --json
+treecer node update "~/Planning/Option selection" --revision 3 --status 已解决 --note "User decided: compare options against the intended use case"
 treecer focus ..
 treecer children
 ```
 
-`focus ..` returns to the parent; `children` lists branches you can continue. Status values remain the literal Chinese API values, including `已解决` (resolved). After finishing a child, the assistant checks what remains in the parent discussion.
+Literal status values are 讨论中 (in discussion), 已解决 (resolved), 暂放 (deferred), and 已取消 (cancelled). After finishing a child, check the parent's remaining questions and deferred branches.
 
-## Resume and use multiple chats
+## Other tasks
 
-Run `context show` again in the same workspace to resume the CLI position. Independent chats or terminals can use stable identities:
+An absolute path selects a project, task, and node:
 
 ```text
-treecer context show --source codex --session chat-123
+treecer context show "/Project/OtherTopic/Planning"
 ```
 
-Keep the same `--source` and `--session` on later calls, or supply the session through `TREECER_SESSION`. Sources accessing the same project share content while retaining separate conversation positions.
+The path must exist. Cross-task reads are allowed and preserve the current binding and position. Cross-task writes stop with a warning naming the target; confirm by retrying with `treecer sudo <original command>` or --sudo. The override applies to that request only.
 
-Read `treecer doc reference --en` for MCP connections, parameters, and troubleshooting; `treecer doc core-concept --en` for the data model; and `treecer doc workflow --en` for discussion practice.
+## Resume
+
+CLI resumes by workspace by default. Independent chats or terminals can keep the same --source and --session, or provide the session through TREECER_SESSION. task use selects a task by name and restores its position.
+
+MCP uses scope.workspace and a stable scope.session. Mutating tools take sudo=true for an explicit cross-task write. See `treecer doc reference --en` for parameters and migration details.

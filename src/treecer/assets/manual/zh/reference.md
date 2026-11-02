@@ -1,142 +1,132 @@
 # 操作参考
 
-## CLI 入口与公共参数
+## 入口和公共参数
 
 ```text
 treecer --help
 treecer --version
 treecer setup
 treecer doc
-treecer doc quick-start
-treecer doc core-concept --en
+treecer doc quick-start --en
 ```
 
-`doc` 的主题为 `quick-start`、`core-concept`、`workflow`、`reference`。省略主题列出目录，默认中文，`--en` 选择英文。`doc --json` 返回目录结构，`doc <主题> --json` 返回语言、主题、标题和正文。手册随当前安装版本分发，查询无需初始化项目。
-
-公共参数可放在根命令或末级命令之后：
+手册主题为 quick-start、core-concept、workflow、reference。doc 省略主题列目录，默认中文，--en 选英文；--json 返回结构化目录或正文。读取手册无需项目绑定。
 
 | 参数 | 用途 |
 | --- | --- |
-| `--home` | Treecer 用户数据目录，覆盖 `TREECER_HOME` 与默认目录 |
-| `--workspace` / `-C` | 实际工作区；CLI 默认当前工作目录 |
-| `--project` / `-p` | 按 ID 或唯一名称显式选择并固定项目 |
-| `--source` | 接入来源，CLI 默认 cli |
-| `--session` | 稳定会话标识，优先于 `TREECER_SESSION` |
-| `--json` | 数据命令及 doc 的结构化输出 |
+| --home | 数据目录，覆盖 TREECER_HOME 与默认目录 |
+| --workspace / -C | 实际工作区，CLI 默认工作目录 |
+| --project / -p | 手动按名称选择并固定项目 |
+| --source | 来源，CLI 默认 cli |
+| --session | 稳定聊天标识，优先于 TREECER_SESSION |
+| --json | 结构化输出 |
+| --sudo | 确认本次跨任务写入，也可用 treecer sudo 前缀 |
 
-`setup` 输出接入指南与 skill 位置；`mcp` 启动 stdio 协议服务。
+公共参数可以放在根命令或末级命令之后。shell 中将 "~/..." 加引号，保持 Treecer 的任务根语义。
 
-## 项目、任务和树
+## 项目与任务
 
 ```text
 treecer projects
 treecer context show
-treecer context use --project Project
 treecer context use --project Project --task Topic
 treecer context reset
 treecer task list
+treecer task list --at "/OtherProject"
 treecer task add Topic
-treecer task use T1
-treecer tree list
-treecer tree list --task T1
-treecer tree add 方案讨论 --task T1 --note "问题与目的：……"
-treecer tree add 项目灵感 --project-level
-treecer focus --tree R1
-treecer focus --task T1
-treecer focus --project-level
+treecer task use Topic
 ```
 
-任务可用 ID 或唯一的完整标题选择。同名任务返回匹配项，使用 ID 区分。`task add` 选择新任务；`tree add` 进入新树根。`focus --task` 选择任务并进入任务概览，`focus --project-level` 进入项目级概览。`tree list` 默认列当前任务的树，`--project-level` 列项目级树。
+task add 创建任务及根节点，并选中新任务；task use 按唯一名称选择任务，恢复该任务的位置。每个任务就是一棵树，各讨论主题用 node add 创建。
 
-项目定位依次采用：显式项目、手动固定的会话绑定、实际工作区发现、缺少工作区时的历史会话绑定。自动发现从工作区向上查找项目标记或路径登记，遇到 Git 根目录时使用该工作区；没有线索则登记新项目。同名工作区会得到带后缀的不同项目名。
+项目解析依次使用显式项目、固定会话关联、实际工作区发现、缺少工作区时的历史绑定。发现时向上查找 .treecer/project.json 或已登记路径，遇到 Git 根目录时使用该工作区；没有线索则自动登记。同名工作区得到带后缀的不同项目名。
 
-显式 `--project` 会固定该来源与会话的项目，随后优先使用固定关联；`context reset` 清除该关联并重新发现，保留项目内容和各项目的位置。
+context reset 清除项目固定关联并重新发现，保留数据、任务选择和位置。项目名称与同项目任务名称唯一，按原字符和大小写匹配。
 
-## 节点和局部导航
+## 路径、读取和导航
 
 ```text
-treecer node get N27 --tree R1
-treecer context show
-treecer path N27
-treecer parent N27
-treecer children N27 --limit 20 --offset 0
-treecer find 方案比较 --tree R1 --limit 20 --offset 0
-treecer node add 比较标准 --parent N27 --note "待讨论：……"
-treecer node update N28 --revision 1 --title 候选排序 --status 暂放 --note "返回条件：……"
-treecer node move N28 N30 --revision 2
-treecer focus N28
+treecer context show "~/方案讨论"
+treecer node get "~/方案讨论/方案比较"
+treecer path "~/方案讨论/方案比较"
+treecer parent "~/方案讨论/方案比较"
+treecer children "~" --limit 20 --offset 0
+treecer find 方案比较 --at "/Project/Topic" --limit 20
+treecer focus "~/方案讨论/方案比较"
 treecer focus ..
+treecer focus "~"
 ```
 
-示例 ID 和修订号按实际返回值填写。指定节点时使用项目内 ID，`--tree` 可核对归属；省略节点时使用本会话位置。只指定树时读取其根节点。根节点的父路径为空，`focus ..` 在树根保持原位置。
+~ 指向当前绑定任务的根；绝对地址是 /项目/任务/节点；相对路径从当前位置解析。/ 列项目，/项目 列任务。任务根的父位置是项目目录，绝对根的父位置为空。
 
-普通读取与新增孩子保留焦点。`context show` 和 `node get` 返回当前正文、祖先路径与一层孩子；`children` 只返回直接孩子的 ID、标题、状态。分页默认 50 项，`limit` 为正数、`offset` 非负，`next_offset` 非空时有下一页。标题查找按文字子串匹配，返回各项路径。
+读取返回 prompt、current、target、source、session，以及节点、祖先或孩子等操作数据。prompt 始终显示保存的真实位置，current 的 project/task 表示当前绑定；target 表示本次对象归属。node 包含 title、path、absolute_path、parent、note、status、revision，内部 ID 留在存储层。
 
-状态参数为「讨论中、已解决、暂放、已取消」。更新只修改提供的字段，`--note ''` 清空正文。读取返回 `revision`，更新和移动必须携带；冲突时返回 `REVISION_CONFLICT` 和当前节点，合并后再提交。移动保留分支全部节点 ID，保持同树、单根和无环。
+单次查看保留位置。focus 明确移动位置，跨任务 focus 保留原任务绑定，外部位置以绝对路径显示。读取外部节点、列孩子、查父节点和搜索均可直接执行。
 
-提示路径对 `/`、`%` 和换行转义，JSON 路径保留原始标题和各段 ID。名称用于显示，ID 用于定位。
+孩子按创建顺序列出，更新正文保留顺序。默认每页 50 项，limit 为正数，offset 非负。next_offset 非空表示还有后续页。find 按标题文字子串查找，默认当前任务，可用 --at 选择子树、项目或全局范围。
 
-## MCP 接入
+## 新增、更新与移动
 
-按客户端格式配置以下服务器条目。`command` 使用客户端能找到的 treecer 可执行文件或其绝对路径：
+```text
+treecer node add 方案讨论 --parent "~"
+treecer node add 方案比较 --parent "~/方案讨论" --note "待讨论：……"
+treecer node update "~/方案讨论/方案比较" --revision 3 --title 方案选择 --status 暂放 --note "返回条件：……"
+treecer node move "~/方案讨论/方案选择" "~/其他主题" --revision 4
+```
+
+修订号以实际读取结果为准。新增和普通更新保持位置；改名与移动保留内部身份，会话位置跟随新路径。同父节点下名称唯一，不同分支可以同名；名称含斜杠、百分号、换行或完整名称 .、..、~ 时按 core-concept 的路径段规则编码。
+
+更新只改提供字段，--note '' 清空正文。状态为「讨论中、已解决、暂放、已取消」。任务根可以更新正文和状态；其位置和根名称由任务身份确定。移动检查名称冲突与无环关系，支持跨任务、跨项目的整条分支移动。
+
+跨任务写入未提供 sudo 时返回 SUDO_REQUIRED，指出当前任务、目标归属、目标路径及本任务候选路径。确认后重试原指令：
+
+```text
+treecer sudo node update "/Project/OtherTopic/方案讨论" --revision 5 --note "已核对目标"
+```
+
+该次覆写保留绑定和所选节点；若移动了所选节点，位置随节点显示新路径。后续请求重新检查。移动检查来源和目的地两端的任务归属。显式 task use / context use 用于换绑，focus 用于导航。
+
+## MCP
+
+按客户端配置格式添加：
 
 ```json
 {
   "command": "treecer",
-  "args": ["mcp", "--workspace", "V:/work/Project", "--source", "codex"]
+  "args": ["mcp", "--workspace", "/absolute/path/to/project", "--source", "my-assistant"]
 }
 ```
 
-启动参数沿用公共参数，MCP 通过 stdio 通信，日志走 stderr。服务说明、工具描述和参数 schema 指导助手调用。
+command 可填客户端能找到的可执行文件或绝对路径。服务通过 stdio 通信，日志走 stderr。工具包括 context、projects、tasks、use_task、add_node、update_node、move_node、path、parent、children、find_nodes、focus、reset_context。
 
-工具为 `context`、`projects`、`tasks`、`trees`、`add_node`、`update_node`、`move_node`、`path`、`parent`、`children`、`find_nodes`、`focus`、`reset_context`。
+- context(path?) 返回上下文；path、parent、children 和 find_nodes 也使用路径。
+- tasks 省略 title 列任务，提供 title 创建任务；use_task(title) 按名称换绑。
+- add_node(title,parent?,note?,sudo?) 新增孩子；update_node(path,revision,...) 更新字段。
+- move_node(path,new_parent,revision,sudo?) 移动分支；跨任务写请求显式 sudo=true。
+- focus(path) 保存当前位置；reset_context 清除项目固定关联。
 
-- `tasks` 省略 title 列任务，提供 title 创建并选择任务。
-- `trees` 省略 title 列树，提供 title 创建并进入树；task 选择任务，project_level 选择项目级树。
-- `context` 返回概览或节点上下文；`add_node` 默认在当前节点下新增。
-- `update_node` / `move_node` 携带读取到的 revision；字段和效果与 CLI 对应。
-- `focus` 保存位置，node_id 可以为 `..`。`reset_context` 清除会话项目关联，下一次调用重新发现。
+工具 scope 可提供 workspace、project 名称、source 和 session。每个聊天使用自己的稳定 session；未提供时服务器生成并返回一个，跨重启时重新提供。MCP 不从服务启动目录推测实际工作区；没有工作区、显式项目或历史绑定时返回 CONTEXT_REQUIRED。
 
-工具的 scope 可以补充实际工作区与聊天身份：
+## 数据和升级
 
-```json
-{
-  "scope": {
-    "workspace": "V:/work/Project",
-    "source": "codex",
-    "session": "host-chat-123"
-  }
-}
-```
+默认数据目录：Windows 为 %LOCALAPPDATA%\Treecer，其他平台为 ~/.local/share/Treecer。可用 TREECER_HOME 或 --home 覆盖。
 
-scope 字段均可省略；workspace 来自启动或工具参数，project 是手动固定项目的入口。首次定位后，相同来源和会话可以按历史绑定恢复。每个聊天保持自己的 session；服务生成的默认 session 随结果返回，跨重启时重新提供它，或使用 `--session` / `TREECER_SESSION`。
+catalog.sqlite 保存项目、工作区、会话绑定和位置；projects/<内部项目身份>/project.sqlite 保存各项目的任务和节点。本地 SQLite 使用事务及回滚日志，将跨项目分支移动和位置跟随作为一次提交。
 
-MCP 根据明确的实际工作区定位，缺少工作区、显式项目与历史绑定时返回 `CONTEXT_REQUIRED`，补充一次 scope 即可继续。
+0.1.2 首次访问时事务迁移 0.1.1 数据：原树根成为任务根下的主题，正文和状态保留，原位置转换到新路径。旧项目级主题归入新建 inbox 任务；名称已占用时使用 inbox (2) 等可区分名称。新版使用路径接口；升级前结束旧版本服务进程。
 
-## 数据位置、备份和错误
+旧任务或迁移后的同父节点重名时，返回 MIGRATION_CONFLICT 并回滚该项目迁移，保留原数据；需要先确定这些条目的新名称。备份时关闭相关进程，完整复制数据目录和工作区标记；恢复后用 context show 核对位置。
 
-默认数据目录为 Windows 的 `%LOCALAPPDATA%\Treecer`，其他平台的 `~/.local/share/Treecer`；`TREECER_HOME` 或 `--home` 可覆盖。目录包含：
+## 错误处理
 
-```text
-catalog.sqlite
-projects/<项目ID>/project.sqlite
-```
+- SUDO_REQUIRED：核对目标后显式 sudo，或修正到当前任务路径。
+- REVISION_CONFLICT：合并 current 中的最新内容，携带最新 revision。
+- DUPLICATE_NAME：选择同父下不同名称，或更新已有节点。
+- NODE_NOT_FOUND / TASK_NOT_FOUND / PROJECT_NOT_FOUND：核对路径及项目数据目录；节点错误会提供最近存在的祖先。
+- TASK_REQUIRED / NODE_REQUIRED：选择任务或节点。
+- INVALID_MOVE / ROOT_OPERATION：保持无环和任务根结构。
+- TARGET_CHANGED：目标在本次解析后已移动，重新读取路径。
+- MIGRATION_CONFLICT：原项目内容保留，先确定同名条目的新名称。
+- STORE_BUSY：稍后重新读取并操作。
 
-catalog 保存项目、工作区和会话项目关联；各项目库保存任务、树、节点与位置。工作区的 `.treecer/project.json` 与同一数据目录配合使用。多个本机进程通过 WAL、外键和短事务共同访问，节点修订号检查过期编辑。
-
-备份时关闭相关 Treecer 进程，完整复制数据目录和工作区标记；异常退出留下的 `-wal` / `-shm` 文件一并保留。恢复对应文件后，用 `context show` 核对项目与位置。
-
-| 错误 | 处理 |
-| --- | --- |
-| `CONTEXT_REQUIRED` | 提供实际工作区或已登记项目 |
-| `PROJECT_NOT_FOUND` | 核对项目选择、数据目录和工作区标记是否来自同一套数据 |
-| `INVALID_MARKER` / `PROJECT_MISMATCH` | 核对项目标记或数据库身份，恢复正确文件 |
-| `NODE_REQUIRED` | 选择节点、选择树或创建树 |
-| `NODE_NOT_FOUND` / `TREE_NOT_FOUND` / `TASK_NOT_FOUND` | 在当前项目中查询实际 ID |
-| `AMBIGUOUS_TASK` | 使用返回匹配项中的任务 ID |
-| `TREE_MISMATCH` / `TASK_MISMATCH` | 核对节点、树和任务归属 |
-| `INVALID_MOVE` | 选择同树内有效父节点，保持根与无环关系 |
-| `REVISION_CONFLICT` | 合并 current 中的最新内容，使用最新 revision 提交 |
-| `STORE_BUSY` / `WORKSPACE_CHANGED` | 稍后重新调用；重新读取所需上下文 |
-
-CLI 操作失败时输出错误并返回非零退出码；MCP 返回工具错误。未知文档主题由命令帮助列出可用名称。
+CLI 错误返回非零退出码；MCP 返回工具错误。

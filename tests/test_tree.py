@@ -1,10 +1,22 @@
 from concurrent.futures import ThreadPoolExecutor
+import sqlite3
 
 import pytest
 
 from treecer.context import ContextResolver
 from treecer.errors import TreecerError
 from treecer.service import TreeService
+from treecer.store import transaction
+
+
+def assert_public(value):
+    if isinstance(value, dict):
+        assert not any(key == "id" or key.endswith("_id") for key in value), value
+        for item in value.values():
+            assert_public(item)
+    elif isinstance(value, list):
+        for item in value:
+            assert_public(item)
 
 
 @pytest.fixture
@@ -19,141 +31,307 @@ def env(tmp_path):
     return make, home, workspace
 
 
-def test_discussion_roundtrip_and_independent_source_positions(env):
-    make, _, _ = env
-    first = make()
-    first.create_task("Topic")
-    root = first.create_tree("方案讨论")["node"]
-    a = first.add_node("方案比较")["node"]
-    b = first.add_node("暂放问题", note="返回条件：方案比较讨论结束")["node"]
-    first.update_node(b["id"], 1, status="暂放")
-    first.focus(a["id"])
-    leaf = first.add_node("比较标准", note="助手建议：按相关性筛选")["node"]
-    first.focus(leaf["id"])
-    second = make("other", "chat-1")
-    assert second.get_context()["node"] is None
-    second.focus(root["id"])
-    assert make().get_context()["node"]["id"] == leaf["id"]
-    assert make("other", "chat-1").get_context()["node"]["id"] == root["id"]
-    context = first.get_context()
-    assert context["prompt"] == f"Topic@Project# 方案讨论/方案比较/比较标准 [{leaf['id']}]"
-    assert [item["id"] for item in context["path"]] == [root["id"], a["id"], leaf["id"]]
-    first.update_node(leaf["id"], 1, status="已解决", note="用户已确定：保留候选细节")
-    first.focus("..")
-    assert first.get_parent()["parent"]["id"] == root["id"]
-    first.focus("..")
-    children = first.show_children()["children"]
-    assert children == [
-        {"id": a["id"], "title": "方案比较", "status": "讨论中"},
-        {"id": b["id"], "title": "暂放问题", "status": "暂放"},
-    ]
-
-
-def test_ids_duplicate_names_rename_move_and_conflicts(env):
-    make, _, _ = env
+def ready(make):
     service = make()
-    root = service.create_tree("root")["node"]
-    first = service.add_node("same")["node"]
-    second = service.add_node("same")["node"]
-    assert first["id"] != second["id"]
-    leaf = service.add_node("a/b%", first["id"])["node"]
-    service.focus(leaf["id"])
-    changed = service.update_node(first["id"], 1, title="renamed")["node"]
-    with pytest.raises(TreecerError, match="已被其他调用更新") as error:
-        service.update_node(first["id"], 1, note="old snapshot")
-    assert error.value.code == "REVISION_CONFLICT"
-    assert error.value.details["current"]["revision"] == 2
-    service.move_node(first["id"], second["id"], changed["revision"])
-    context = make().get_context()
-    assert [part["id"] for part in context["path"]] == [root["id"], second["id"], first["id"], leaf["id"]]
-    assert context["path"][-1]["title"] == "a/b%"
-    assert context["prompt"].endswith(f"/a%2Fb%25 [{leaf['id']}]")
-    with pytest.raises(TreecerError) as error:
-        service.move_node(second["id"], leaf["id"], 1)
-    assert error.value.code == "INVALID_MOVE"
-    assert service.get_context(second["id"])["node"]["revision"] == 1
-    cleared = service.update_node(leaf["id"], 1, note="")["node"]
-    assert cleared["note"] == ""
-    assert cleared["title"] == "a/b%"
+    service.create_task("Topic")
+    return service
 
 
-def test_project_and_tree_boundaries(env, tmp_path):
-    make, home, _ = env
-    a = make()
-    a.create_task("Topic")
-    a_root = a.create_tree("Project root", note="private content")["node"]
-    other_tree = a.create_tree("second tree")["node"]
+def test_discussion_roundtrip_independent_sources_and_truthful_prompt(env):
+    make, _, _ = env
+    service = ready(make)
+    added = service.add_node("方案讨论")
+    assert added["prompt"] == "Topic@Project: ~$"
+    assert added["node"]["path"] == "~/方案讨论"
+    service.focus("~/方案讨论")
+    service.add_node("方案比较", note="待讨论：如何选择方案？")
+    deferred = service.add_node("压缩")
+    service.update_node(
+        deferred["node"]["path"], deferred["node"]["revision"], status="暂放"
+    )
+    service.focus("方案比较")
+    leaf = service.add_node("比较标准")["node"]
+    service.focus(leaf["path"])
+    other = make("other", "chat-1")
+    assert other.get_context()["node"] is None
+    other.use_task("Topic")
+    assert other.get_context()["current"]["path"] == "~"
+    current = make().get_context()
+    assert current["prompt"] == "Topic@Project: ~/方案讨论/方案比较/比较标准$"
+    assert [part["path"] for part in current["ancestors"]] == [
+        "~",
+        "~/方案讨论",
+        "~/方案讨论/方案比较",
+        "~/方案讨论/方案比较/比较标准",
+    ]
+    assert_public(current)
+    service.update_node(
+        leaf["path"], leaf["revision"], status="已解决", note="用户已确定：保留细节"
+    )
+    service.focus("..")
+    service.focus("..")
+    children = service.show_children()["children"]
+    assert [(row["title"], row["status"]) for row in children] == [
+        ("方案比较", "讨论中"),
+        ("压缩", "暂放"),
+    ]
+    assert make("other", "chat-1").get_context()["current"]["path"] == "~"
+
+
+def test_name_uniqueness_and_titles_are_preserved(env):
+    make, _, _ = env
+    service = ready(make)
     with pytest.raises(TreecerError) as error:
-        a.add_node("bad edge", a_root["id"], other_tree["tree_id"])
-    assert error.value.code == "TREE_MISMATCH"
+        service.create_task("Topic")
+    assert error.value.code == "DUPLICATE_NAME"
+    service.add_node("left")
+    service.add_node("right")
+    first = service.add_node("same", parent="~/left")["node"]
+    service.add_node("same", parent="~/right")
+    with pytest.raises(TreecerError) as error:
+        service.add_node("same", parent="~/left")
+    assert error.value.code == "DUPLICATE_NAME"
     with pytest.raises(TreecerError):
-        a.move_node(a.add_node("child")["node"]["id"], a_root["id"], 1)
+        service.move_node(first["path"], "~/right", first["revision"])
+    for title, encoded in [
+        ("a/b%", "a%2Fb%25"),
+        (".", "%2E"),
+        ("..", "%2E%2E"),
+        ("~", "%7E"),
+        ("line\nbreak", "line%0Abreak"),
+    ]:
+        node = service.add_node(title)["node"]
+        assert node["path"] == "~/" + encoded
+        assert service.get_context(node["path"])["node"]["title"] == title
+    assert service.get_context(first["path"])["node"]["title"] == "same"
+
+
+def test_rename_move_preserve_internal_identity_and_resume(env):
+    make, _, _ = env
+    service = ready(make)
+    source = service.add_node("branch")["node"]
+    service.add_node("destination")
+    leaf = service.add_node("leaf", parent=source["path"])["node"]
+    identity = service.nav.locate(leaf["path"]).node["id"]
+    service.focus(leaf["path"])
+    renamed = service.update_node(source["path"], source["revision"], title="renamed")[
+        "node"
+    ]
+    moved = service.move_node(renamed["path"], "~/destination", renamed["revision"])
+    assert moved["prompt"] == "Topic@Project: ~/destination/renamed/leaf$"
+    assert make().nav.locate().node["id"] == identity
+    assert make().get_context()["node"]["title"] == "leaf"
+    with pytest.raises(TreecerError) as error:
+        service.move_node(
+            "~/destination",
+            "~/destination/renamed/leaf",
+            service.get_context("~/destination")["node"]["revision"],
+        )
+    assert error.value.code == "INVALID_MOVE"
+    assert_public(moved)
+
+
+def test_stale_revision_and_reused_path_cannot_update_a_different_node(env):
+    make, _, _ = env
+    service = ready(make)
+    first = service.add_node("a", note="original")["node"]
+    service.update_node("~/a", first["revision"], title="renamed")
+    replacement = service.add_node("a", note="new node")["node"]
+    assert replacement["revision"] != first["revision"]
+    with pytest.raises(TreecerError) as error:
+        service.update_node("~/a", first["revision"], note="stale")
+    assert error.value.code == "REVISION_CONFLICT"
+    assert error.value.details["current"]["note"] == "new node"
+    assert_public(error.value.as_dict())
+    current = service.update_node("~/a", replacement["revision"], note="")["node"]
+    assert current["note"] == "" and current["title"] == "a"
+
+
+def test_navigation_normalizes_before_task_scope_checks(env):
+    make, _, _ = env
+    service = ready(make)
+    service.add_node("branch")
+    service.create_task("other")
+    foreign = service.add_node("node")["node"]
+    service.use_task("Topic")
+    service.focus("~/branch")
+    read = service.get_context("../../other/node")
+    assert read["target"]["absolute_path"] == "/Project/other/node"
+    assert read["prompt"] == "Topic@Project: ~/branch$"
+    with pytest.raises(TreecerError) as error:
+        service.update_node("../../other/node", foreign["revision"], note="wrong task")
+    assert error.value.code == "SUDO_REQUIRED"
+    assert error.value.details["current_task_candidate"] == "~/node"
+    assert service.get_parent("~")["parent"]["path"] == "/Project"
+    service.focus("~")
+    service.focus("..")
+    assert service.get_context()["current"]["path"] == "/Project"
+    assert service.get_context("~/branch")["node"]["title"] == "branch"
+    assert service.show_children("/")["children"][0]["path"] == "/Project"
+
+
+def test_cross_task_reads_free_writes_explicit_and_override_not_sticky(env):
+    make, _, _ = env
+    service = ready(make)
+    service.add_node("local")
+    service.focus("~/local")
+    service.create_task("other")
+    external = service.add_node("branch")["node"]
+    service.add_node("child", parent="~/branch")
+    service.use_task("Topic")
+    before = service.get_context()["current"]
+    path = "/Project/other/branch"
+    for result in [
+        service.get_context(path),
+        service.get_path(path),
+        service.get_parent(path),
+        service.show_children(path),
+        service.find_nodes("child", path=path),
+    ]:
+        assert result["current"] == before
+        assert_public(result)
+    with pytest.raises(TreecerError) as error:
+        service.add_node("new", parent=path)
+    assert error.value.code == "SUDO_REQUIRED"
+    created = service.add_node("new", parent=path, sudo=True)
+    assert created["current"] == before and created["node"]["path"] == path + "/new"
+    changed = service.update_node(
+        path, external["revision"], note="confirmed", sudo=True
+    )
+    assert changed["current"] == before
+    with pytest.raises(TreecerError) as error:
+        service.update_node(path, changed["node"]["revision"], note="not confirmed")
+    assert error.value.code == "SUDO_REQUIRED"
+    with pytest.raises(TreecerError):
+        service.move_node(
+            "~/local", path, service.get_context("~/local")["node"]["revision"]
+        )
+    service.focus(path)
+    assert (
+        service.get_context()["prompt"] == "Topic@Project: /Project/other/branch$"
+    )
+    with pytest.raises(TreecerError):
+        service.add_node("implicit write to foreign cwd")
+    service.focus("~")
+    assert service.get_context()["current"]["path"] == "~"
+
+
+def test_cross_task_move_and_session_following(env):
+    make, _, _ = env
+    service = ready(make)
+    branch = service.add_node("branch")["node"]
+    service.add_node("leaf", parent=branch["path"])
+    service.focus("~/branch/leaf")
+    service.create_task("other")
+    service.use_task("Topic")
+    service.move_node("~/branch", "/Project/other", branch["revision"], sudo=True)
+    current = service.get_context()
+    assert current["current"]["task"] == "Topic"
+    assert current["current"]["path"] == "/Project/other/branch/leaf"
+    assert service.get_context("/Project/other/branch")["node"]["title"] == "branch"
+    service.focus("~")
+    assert service.show_children()["children"] == []
+
+
+def test_cross_project_move_is_atomic_and_preserves_identity(env, tmp_path):
+    make, home, _ = env
+    service = ready(make)
+    branch = service.add_node("branch")["node"]
+    service.add_node("leaf", parent=branch["path"])
+    identity = service.nav.locate("~/branch/leaf").node["id"]
+    service.focus("~/branch/leaf")
     game = tmp_path / "OtherProject"
     game.mkdir()
-    b = TreeService(ContextResolver(home, game, "codex", "chat-1"))
-    assert b.get_context()["tasks"] == []
-    b_root = b.create_tree("Game root")["node"]
-    assert a_root["id"] == b_root["id"]  # Independent project-local numbering.
-    assert b.get_context(a_root["id"])["node"]["note"] == ""
-    assert a.get_context(a_root["id"])["node"]["note"] == "private content"
-    assert a.database != b.database
-    assert make().get_context()["project"]["id"] == a.context["id"]
+    other = make("other", "other-chat", game)
+    other.create_task("combat")
+    before = other.get_context()["current"]
+    service.move_node("~/branch", "/OtherProject/combat", branch["revision"], sudo=True)
+    assert service.nav.locate("/OtherProject/combat/branch/leaf").node["id"] == identity
+    assert service.get_context()["current"]["path"] == "/OtherProject/combat/branch/leaf"
+    assert other.get_context()["current"] == before
+    assert other.get_context("~/branch/leaf")["node"]["title"] == "leaf"
+    assert service.get_context("~")["children"] == []
+    assert service.database != other.database
 
 
-def test_pagination_search_and_read_does_not_focus(env):
+def test_cross_project_failed_move_rolls_back_all_files(env, tmp_path):
     make, _, _ = env
-    service = make()
-    root = service.create_tree("root")["node"]
-    children = [service.add_node("match")["node"] for _ in range(7)]
-    service.add_node("grandchild", children[0]["id"])
+    service = ready(make)
+    node = service.add_node("branch", note="valuable")["node"]
+    service.add_node("leaf", parent="~/branch")
+    service.focus("~/branch/leaf")
+    game = tmp_path / "OtherProject"
+    game.mkdir()
+    other = make("other", "chat", game)
+    other.create_task("combat")
+    with transaction(service.database, write=True) as (db, _):
+        db.execute(
+            "CREATE TRIGGER fail_move BEFORE DELETE ON nodes WHEN OLD.title='branch' BEGIN SELECT RAISE(ABORT,'injected'); END"
+        )
+    with pytest.raises(sqlite3.IntegrityError, match="injected"):
+        service.move_node("~/branch", "/OtherProject/combat", node["revision"], sudo=True)
+    assert service.get_context("~/branch")["node"]["note"] == "valuable"
+    assert service.get_context()["current"]["path"] == "~/branch/leaf"
+    assert other.show_children("~")["children"] == []
+
+
+def test_pagination_search_creation_order_and_concurrent_add(env):
+    make, _, _ = env
+    service = ready(make)
+    for index in range(7):
+        service.add_node(f"item-{index}")
+    first = service.get_context("~/item-0")["node"]
+    service.update_node(first["path"], first["revision"], note="updated")
     page = service.show_children(limit=3)
-    assert [row["id"] for row in page["children"]] == [row["id"] for row in children[:3]]
+    assert [row["title"] for row in page["children"]] == ["item-0", "item-1", "item-2"]
     assert page["next_offset"] == 3
-    page2 = service.show_children(limit=3, offset=6)
-    assert len(page2["children"]) == 1 and page2["next_offset"] is None
-    matches = service.find_nodes("match", limit=2)
-    assert len(matches["matches"]) == 2 and matches["next_offset"] == 2
-    assert matches["matches"][0]["path"][-1]["id"] == children[0]["id"]
-    service.get_context(children[0]["id"])
-    assert make().get_context()["node"]["id"] == root["id"]
-    assert service.get_parent(root["id"])["path"] == []
+    assert service.show_children(limit=3, offset=6)["next_offset"] is None
+    assert service.find_nodes("item-", limit=2)["next_offset"] == 2
     with pytest.raises(TreecerError):
         service.show_children(limit=0)
 
-
-def test_task_scope_and_selection(env):
-    make, _, _ = env
-    service = make()
-    project_tree = service.create_tree("inbox", project_level=True)["node"]
-    task = service.create_task("work")["created"]
-    assert service.get_context()["node"] is None
-    root = service.create_tree("work discussion")["node"]
-    service.create_tree("other discussion")
-    assert len(service.list_trees()["trees"]) == 2
-    assert len(service.list_trees(project_level=True)["trees"]) == 1
-    service.focus(project_level=True)
-    assert service.get_context()["task"] is None
-    service.focus(task=task)
-    assert service.get_context()["task"]["id"] == task
-    assert service.get_context()["node"] is None
-    service.focus(root["id"], task=task)
-    with pytest.raises(TreecerError) as error:
-        service.focus(project_tree["id"], task=task)
-    assert error.value.code == "TASK_MISMATCH"
-    service.create_task("work")
-    with pytest.raises(TreecerError) as error:
-        service.focus(task="work")
-    assert error.value.code == "AMBIGUOUS_TASK"
-
-
-def test_concurrent_creates_get_unique_ids(env):
-    make, _, _ = env
-    root = make().create_tree("root")["node"]
-
     def add(index):
-        return make("worker", str(index)).add_node(str(index), root["id"])["node"]["id"]
+        worker = make("worker", str(index))
+        worker.use_task("Topic")
+        return worker.add_node(f"worker-{index}")
 
     with ThreadPoolExecutor(max_workers=6) as pool:
-        ids = list(pool.map(add, range(18)))
-    assert len(set(ids)) == 18
-    assert len(make().show_children(root["id"])["children"]) == 18
+        replies = list(pool.map(add, range(18)))
+    assert len({row["node"]["path"] for row in replies}) == 18
+    assert all(row["current"]["path"] == "~" for row in replies)
+    assert len(service.show_children()["children"]) == 25
+    for row in replies:
+        assert_public(row)
+
+
+def test_root_content_and_global_namespace(env):
+    make, _, _ = env
+    service = ready(make)
+    root = service.get_context("~")["node"]
+    changed = service.update_node("~", root["revision"], note="task purpose")
+    assert changed["node"]["note"] == "task purpose"
+    with pytest.raises(TreecerError):
+        service.update_node("~", changed["node"]["revision"], title="new root")
+    with pytest.raises(TreecerError):
+        service.move_node("~", "~", changed["node"]["revision"])
+    service.focus("/")
+    assert service.get_parent()["parent"] is None
+    assert service.get_context()["node"] is None
+    service.focus("~")
+    assert service.get_context()["node"]["note"] == "task purpose"
+
+
+def test_unbound_reader_gets_actionable_write_warning(env):
+    make, _, _ = env
+    owner = ready(make)
+    node = owner.add_node("topic")["node"]
+    reader = make("reader", "new-chat")
+    assert reader.get_context("/Project/Topic/topic")["node"]["title"] == "topic"
+    with pytest.raises(TreecerError) as error:
+        reader.update_node(
+            "/Project/Topic/topic", node["revision"], note="unconfirmed"
+        )
+    assert error.value.code == "SUDO_REQUIRED"
+    assert error.value.details["current_task_candidate"] is None
+    assert "task use" in str(error.value)
+    assert owner.get_context("~/topic")["node"]["note"] == ""

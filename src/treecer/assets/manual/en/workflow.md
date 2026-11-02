@@ -1,53 +1,53 @@
 # Discussion workflow
 
-## Start from the current location
+## Start at the current position
 
-Call `treecer context show --json` or MCP `context` to inspect the project, task, ancestor path, current content, and direct children. Check that they match the discussion; read ancestors when their context is needed.
+Use `treecer context show --json` or MCP context to inspect the binding, saved position, content, ancestors, and direct children. Verify the discussion object before continuing.
 
-A new session starts at the project overview. Select an existing task when the user refers to it; create a task for new work. Project-level trees can hold questions that do not yet belong to a task.
+A new project starts with a task directory. Select existing work with task use or MCP use_task; create new work with task add or MCP tasks(title=...). Each task has a ~ root with topic nodes beneath it.
 
-## Record useful questions and decisions
+## Record decisions and questions
 
-Store questions worth returning to, including their purpose and enough context to continue. For example:
+Organize the note as useful, for example:
 
 ```text
 Purpose: How can an assistant resume its discussion position?
-User decided: Separate projects from tasks; persist session positions.
-Assistant suggestion: Identify positions by source and session.
-Open question: How does the host provide a stable session identity?
-Next step: Exercise a real client restart.
+User decided: Separate projects and tasks; persist session positions.
+Assistant suggestion: Save positions per source and session.
+Open question: How does the host supply a stable session identity?
+Next step: Exercise a client restart.
 ```
 
-Use the fields that help. Distinguish user decisions, assistant proposals, and open questions. Record missing evidence explicitly. Keep remaining questions when only part of a node is resolved.
+Distinguish user decisions, assistant proposals, and unresolved questions. Keep remaining gaps when only part is settled. State missing evidence explicitly.
 
-## Explore and defer
+## Branch and defer
 
-Use `node add` or MCP `add_node` to create a child for a question worth exploring. The tool assigns its ID. Creation preserves the current position; call `focus` when you move into the new question.
+node add or MCP add_node creates a question beneath the current node, or a supplied parent path. Creation returns its new path while retaining focus. Use focus when actually entering it.
 
-For a branch to revisit later, record its question, context, and return condition. Set its status to `暂放` (deferred), then continue the original discussion. IDs and paths distinguish duplicate titles.
+For a deferred branch, record its question and return condition and set status to 暂放. Sibling names are unique; full paths distinguish repeated names across branches.
 
 ## Conclude and return
 
-When a question is settled, update its conclusions and identify which part of the parent it resolves:
+Read before editing and submit the returned revision. Assuming the actual value is 4:
 
 ```text
-treecer node get N27 --json
-treecer node update N27 --revision 3 --status 已解决 --note "User decided: ..."
+treecer node get "~/Planning/Option" --json
+treecer node update "~/Planning/Option" --revision 4 --status 已解决 --note "User decided: ..."
 treecer parent
 treecer focus ..
 treecer children
 ```
 
-Use the actual returned ID and revision. `parent` reads the parent and path; `focus ..` saves the position at the parent. Check the parent's remaining questions and select an open sibling branch. The user can change the discussion order at any time.
+Check which part of the parent was resolved, return to it, and select an unfinished sibling. Parent status changes explicitly. Users can change discussion order at any time.
 
-Reopen questions with `讨论中` (in discussion). When a new decision replaces an old proposal, update the effective conclusion and retain important reasons when useful.
+Reopen with 讨论中. When a decision supersedes a proposal, update the effective conclusion and preserve useful reasons.
 
-## Update and collaborate
+## Read other tasks and collaborate
 
-Update after important decisions, branching, direction changes, or the end of a discussion round. Keep conversation focused on the substantive questions.
+Use `/project/task/node` to consult other tasks. Reads preserve the binding and focus; results carry the actual target path. For an intended cross-task write, check the warning's target and explicitly provide sudo on that request.
 
-Use the returned `revision` when updating. For `REVISION_CONFLICT`, merge still-valid information with the returned current content before submitting again. Session focus is independent; discussion content is shared.
+For REVISION_CONFLICT, merge still-valid information from current and submit its revision. After renames or moves, use returned paths; saved positions follow internal identities.
 
-Resume with the same source and stable session identity. A different chat can also locate the task and tree explicitly. A non-null child `next_offset` indicates another page is available.
+Each chat keeps a stable source/session. Content is shared; positions are independent. A non-null next_offset indicates another children/search page.
 
-Discussion records follow the current task's authorization. Code implementation, architectural-intent changes, deployment, and external actions follow their respective task authorizations.
+Update at important conclusions, branches, direction changes, or a discussion round's end. Keep conversation substantive. Discussion records follow the current task's authorization; code, architectural-intent changes, deployment, and external actions follow their respective task authorizations.

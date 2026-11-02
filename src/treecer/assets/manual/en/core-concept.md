@@ -1,46 +1,49 @@
 # Core concepts
 
-## Projects, tasks, trees, and nodes
+## Projects, tasks, and nodes
 
-- A project is an independent workspace, such as Project or a another project. Each project has its own database, with a stable ID separate from its display name.
-- A task is ongoing work within a project, such as Topic design. It can continue across multiple chats and assistants.
-- A discussion tree belongs to a project and can be associated with a task. A null task makes it a project-level tree. A task can contain multiple trees.
-- A node stores a question, title, content, status, and parent relationship. Each tree has one root; parent relationships stay within the tree and remain acyclic.
+A project is an independent workspace, such as Project or a another project, with its own database. A task is ongoing project work that can continue across chats. Each task owns a discussion tree rooted at ~; topics and questions are nodes beneath it.
 
-Project-level trees can hold ideas before they become a specific task. The assistant selects or creates tasks from the user's discussion; a new session starts at the project overview.
+Task names are unique within a project. Node names are unique among siblings; separate branches can use the same name. Names match original characters and case exactly. Stable identities maintain internal relationships and positions; public operations use names and paths.
 
-## Identity and names
+## Address space
 
-Project IDs are generated automatically. Task IDs use `T…`, tree IDs `R…`, and node IDs `N…`; the tool assigns them all. Node IDs are unique within a project. Different projects may reuse the same node number, so a complete reference includes its project.
+| Path | Meaning |
+| --- | --- |
+| / | Global Treecer project directory |
+| /Project | The project's task directory |
+| /Project/Topic | A specified task root |
+| ~ | The currently bound task root |
+| ~/Planning | Relative to the task root |
+| Child question | Relative to the current discussion position |
+| . / .. | Current position / parent |
 
-Node titles may repeat. Renaming or moving a node preserves its ID. Title search returns IDs and ancestor paths; use the selected ID for operations. Use task IDs to distinguish duplicate task titles.
+The prompt `Topic@Project: ~/Planning/Option$` corresponds to `/Project/Topic/Planning/Option`. The trailing $ is a prompt marker, not path content.
 
-## Location prompt
+Segments encode / as %2F, % as %25, and line breaks as %0A or %0D. Entire names ., .., and ~ encode as %2E, %2E%2E, and %7E. Segments are decoded after splitting, preserving these characters in node titles.
 
-```text
-Topic@Project# Planning/Option/Comparison criteria [N27]
-```
+## Binding, focus, and target
 
-The first part identifies the task and project; the rest is the root-to-current path. `~` means no selected task; `/` means no selected node.
+The current task defines ~. Focus identifies the current discussion node or a project/global directory. prompt always describes saved focus; target and node describe this operation's object.
 
-The tool follows parent links from the current node to produce the latest path. Prompt segments escape `/`, `%`, and line breaks. Structured JSON paths retain original titles and each segment's ID.
+Reads, creation, updates, and moves do not deliberately switch focus. focus is explicit navigation. Focusing another task preserves the home task binding and displays an absolute location; writes there still require cross-task confirmation. task use changes the binding and restores that task's saved position.
 
-## Content, status, and revision
+Renames and moves preserve internal identity, so saved positions follow nodes to their new paths, including across projects. Callers should update cached path references from returned results.
 
-The Markdown `note` can record the question's purpose, user decisions, assistant suggestions, open questions, and next steps.
+## Content and revision
 
-Status values are the literal API strings `讨论中` (in discussion), `已解决` (resolved), `暂放` (deferred), and `已取消` (cancelled). An open node can contain partial decisions. Parent status changes explicitly. Deferred nodes remain visible and can describe when to return.
+The Markdown note can record purpose, user decisions, assistant suggestions, open questions, and next steps. Literal statuses are 讨论中 (in discussion), 已解决 (resolved), 暂放 (deferred), and 已取消 (cancelled), changed explicitly.
 
-`revision` is a node's revision number. Reads return it; updates and moves supply the revision they were based on. If another call changed the node, the tool returns a conflict and its current content so the assistant can merge before submitting again.
+revision identifies a content version. Read it before updates or moves. Conflicts return REVISION_CONFLICT and current content for merging. Revisions also detect stale writes when an old path is occupied by a different node.
 
-## Sources, sessions, and resume positions
+## Sources and sessions
 
-A source identifies an entry point, such as codex or another assistant. A session identifies a particular chat within that source. Together they identify the project binding and the selected task, tree, and node within the project.
+A source identifies an integration; a session identifies its chat. Project content is shared, while sources/sessions retain separate task selections and positions. Returning to a task restores its saved position.
 
-Sessions can share a tree while retaining their own positions. Reads and child creation preserve focus; `focus` changes it. CLI resumes by workspace by default. Independent chats can pass `--source` and `--session`; MCP passes `scope.source` and `scope.session`.
+CLI defaults to workspace-based resumption; use --source, --session, or TREECER_SESSION to distinguish chats. MCP uses scope.source and scope.session. A generated session is returned when none was supplied; provide it again after restart.
 
-## Project discovery and storage
+## Cross-task operations
 
-CLI uses its working directory or `--workspace`. MCP uses the workspace supplied in startup or tool arguments. `.treecer/project.json` stores the stable project ID. The user data directory's `catalog.sqlite` stores projects and workspace mappings; `projects/<project-ID>/project.sqlite` stores project content and positions.
+Reads, children, paths, and search can access other tasks directly. Writes to another task's content or structure require sudo on the current request. Without it, the result names the current task, target task and path, and a correction candidate, leaving data intact.
 
-An explicit project selection pins the session to that project. Clearing the pin enables workspace discovery again. See `treecer doc reference --en` for precedence, storage locations, and recovery.
+sudo is an internal Treecer request confirmation with no password. Normalize ~, relative segments, and .. before checking the final task ownership. The override preserves the binding and is checked anew on later requests.
