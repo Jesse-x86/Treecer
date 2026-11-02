@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,10 +8,20 @@ version = "0.1.1"
 description = "Local discussion trees for AI-assisted conversations"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["discussion-tree", "ai-assistant", "mcp", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Utilities",
+]
 dependencies = ["mcp>=1.29,<2"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build", "PyYAML"]
+dev = ["pytest>=8", "build", "PyYAML", "twine>=6.1"]
 
 [project.scripts]
 treecer = "treecer.cli:main"
