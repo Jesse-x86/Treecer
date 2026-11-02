@@ -25,7 +25,7 @@ Treecer = **tree + tracer**。这是一个本地 Python 工具，通过 CLI 和 
 
 ## 安装
 
-需要 **Python 3.11+** 和已配置命令路径的 [pipx](https://pipx.pypa.io/stable/)。首个版本发布到 PyPI 后可执行：
+需要 **Python 3.11+** 和已配置命令路径的 [pipx](https://pipx.pypa.io/stable/)。从 [PyPI](https://pypi.org/project/treecer/) 安装：
 
 ```text
 pipx install treecer
