@@ -31,11 +31,13 @@ Treecer = **tree + tracer**。这是一个本地 Python 工具，通过 CLI 和 
 pipx install treecer
 ```
 
-当前可安装收到的发行包，或在源码目录安装：
+wheel 和源码压缩包作为 GitHub Release 附件分发，仓库只保存源码和文档。下载 Release 中的 wheel 后，可从文件安装：
 
 ```text
 pipx install ./treecer-0.1.2-py3-none-any.whl
 ```
+
+也可在源码目录安装：
 
 ```text
 pipx install .
@@ -98,11 +100,15 @@ treecer context show "/Project/OtherTopic/方案讨论"
 查看保留当前绑定与位置。跨任务写入缺少 sudo 时，工具停止并提示：
 
 ```text
-本次修改未执行。你正在尝试修改 OtherTopic@Project 的 ~/方案讨论。
-当前任务是 Topic@Project。
+SUDO_REQUIRED：本次修改未执行。
+当前任务：Topic@Project
+目标任务：OtherTopic@Project
+目标路径：/Project/OtherTopic/方案讨论
+确认目标后，请使用 treecer sudo 重试原指令。
+若本意是当前任务，请核对 "~/方案讨论" 并修正指令。
 ```
 
-完整错误还给出绝对目标路径和当前任务的路径候选。核对目标后，使用 `treecer sudo <原指令>` 或 --sudo；MCP 对应本次请求的 sudo=true。覆写逐次检查，保留当前绑定。分支移动支持跨任务与跨项目，并让保存的位置跟随节点。
+核对目标后，使用 `treecer sudo <原指令>` 或 --sudo；MCP 对应本次请求的 sudo=true。覆写逐次检查，保留当前绑定。分支移动支持跨任务与跨项目，并让保存的位置跟随节点。
 
 ## 与 AI 助手配合
 

@@ -7,6 +7,8 @@ __pycache__/
 .idea/
 build/
 dist/
+*.whl
+*.tar.gz
 .treecer/
 .local-data/
 /DESIGN_DRAFT.md
