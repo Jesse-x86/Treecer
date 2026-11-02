@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "treecer"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local discussion trees for AI-assisted conversations"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ treecer = "treecer.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-treecer = ["assets/skills/treecer/SKILL.md"]
+treecer = ["assets/skills/treecer/SKILL.md", "assets/manual/zh/*.md", "assets/manual/en/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

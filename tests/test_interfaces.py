@@ -94,6 +94,7 @@ def test_real_stdio_mcp_roundtrip_and_restart(tmp_path):
                 tools = await client.list_tools()
                 assert {"context", "tasks", "trees", "add_node", "focus", "update_node", "parent"} <= {
                     tool.name for tool in tools.tools}
+                assert not any(tool.name.startswith(("doc", "manual")) for tool in tools.tools)
 
                 async def call(name, **kwargs):
                     reply = await client.call_tool(name, kwargs)

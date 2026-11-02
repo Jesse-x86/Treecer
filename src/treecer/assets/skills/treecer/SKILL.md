@@ -5,7 +5,7 @@ description: 用 Treecer 工具保存和接续讨论树，在问题分叉、深�
 
 # 用 Treecer 接续讨论
 
-先通过 MCP `context` 或 CLI `treecer context show --json` 读取当前关联。需要接入说明时运行 `treecer setup`，命令语法看 `--help`。
+先通过 MCP `context` 或 CLI `treecer context show --json` 读取当前关联。需要接入说明时运行 `treecer setup`，命令语法看 `--help`。CLI 离线手册用 `treecer doc` 列出主题，`treecer doc reference` 查询参数和错误处理；默认中文，`--en` 阅读英文。
 
 ## 定位
 

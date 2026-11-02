@@ -32,6 +32,10 @@ def parser():
 
     command("projects", "列出已登记项目")
     command("setup", "查看接入说明和随包 skill 位置")
+    doc = command("doc", "查询随包离线手册，默认中文")
+    from .documentation import TOPICS
+    doc.add_argument("topic", nargs="?", choices=TOPICS, help="省略时列出主题")
+    doc.add_argument("--en", action="store_true", help="读取英文手册")
     command("mcp", "启动本地 stdio MCP 服务")
     context = command("context", "查看、换绑或重置会话关联")
     choices = context.add_subparsers(dest="action", required=True)
@@ -137,6 +141,11 @@ def main(argv=None):
             ("home", None), ("workspace", None), ("project", None),
             ("source", None), ("session", None), ("json", False)))
     name, action = args.pop("command"), args.pop("action", None)
+    if name == "doc":
+        from .documentation import manual, render_manual
+        result = manual(args["topic"], english=args["en"])
+        print(json.dumps(result, ensure_ascii=False, indent=2) if as_json else render_manual(result))
+        return
     if name == "setup":
         skill = Path(__file__).parent / "assets" / "skills" / "treecer" / "SKILL.md"
         print(f"Treecer {__version__}\nSkill: {skill}\n"
@@ -144,6 +153,7 @@ def main(argv=None):
               "MCP: treecer mcp --workspace <实际工作区> --source <来源>\n"
               "每个聊天通过 scope.session 提供稳定标识；工具返回的 session 可用于恢复。\n"
               "MCP 未提供工作区时，可在工具 scope.workspace 中传入。\n"
+              "离线手册：treecer doc；快速开始：treecer doc quick-start（--en 阅读英文）。\n"
               "数据位置：TREECER_HOME 或 --home；查看命令：treecer --help")
         return
     if name == "mcp":
